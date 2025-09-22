@@ -74,7 +74,6 @@ export default function TodoDashboard() {
     <div className="max-w-4xl mx-auto">
       <div className="mb-8">
         <h1 className="text-2xl font-mona-heading mb-2">My Tasks</h1>
-        <p className="text-sm text-muted-foreground">Stay organized and productive</p>
       </div>
 
       <div className="mb-6 bg-card rounded-lg p-4 border border-border">
