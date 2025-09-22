@@ -3,11 +3,19 @@ import { preloadQuery, preloadedQueryResult } from "convex/nextjs";
 import { api } from "@/convex/_generated/api";
 
 export default async function ServerPage() {
-  const preloaded = await preloadQuery(api.myFunctions.listNumbers, {
-    count: 3,
-  });
+  let preloaded;
+  let data;
 
-  const data = preloadedQueryResult(preloaded);
+  try {
+    preloaded = await preloadQuery(api.myFunctions.listNumbers, {
+      count: 3,
+    });
+    data = preloadedQueryResult(preloaded);
+  } catch {
+    // Handle case when Convex is not available during build
+    preloaded = null;
+    data = { viewer: null, numbers: [] };
+  }
 
   return (
     <main className="p-8 flex flex-col gap-4 mx-auto max-w-2xl">
@@ -18,7 +26,7 @@ export default async function ServerPage() {
           <pre>{JSON.stringify(data, null, 2)}</pre>
         </code>
       </div>
-      <Home preloaded={preloaded} />
+      {preloaded && <Home preloaded={preloaded} />}
     </main>
   );
 }

@@ -34,7 +34,7 @@ export default function TodoDashboard() {
     setNewTodoDescription("");
   };
 
-  const handleStartEdit = (todo: any) => {
+  const handleStartEdit = (todo: { _id: Id<"todos">; title: string; description?: string }) => {
     setEditingId(todo._id);
     setEditTitle(todo.title);
     setEditDescription(todo.description || "");

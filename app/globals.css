@@ -1,5 +1,5 @@
+@import url('../public/fonts/mona-sans.css');
 @import "tailwindcss";
-@import url('/fonts/mona-sans.css');
 
 :root {
   /* Light mode - using greys instead of pure white */
