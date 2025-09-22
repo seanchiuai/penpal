@@ -1,51 +1,231 @@
-# Welcome to VIBED
+# Next.js + Convex + Clerk Starter Template
 
-This is a [Convex](https://convex.dev/) project created with [`npm create convex`](https://www.npmjs.com/package/create-convex).
+A modern full-stack TypeScript starter template with authentication, real-time database, and beautiful UI components.
 
-After the initial setup (<2 minutes) you'll have a working full-stack app using:
+## 🚀 Tech Stack
 
-- Convex as your backend (database, server logic)
-- [React](https://react.dev/) as your frontend (web page interactivity)
-- [Next.js](https://nextjs.org/) for optimized web hosting and page routing
-- [Tailwind](https://tailwindcss.com/) for building great looking accessible UI
-- [Clerk](https://clerk.com/) for authentication
+- **Frontend**: Next.js 15 with App Router, Tailwind CSS 4
+- **Backend**: Convex (real-time database and serverless functions)
+- **Authentication**: Clerk
+- **Language**: TypeScript
+- **Styling**: Tailwind CSS with shadcn/ui components
 
-## Get started
+## 📋 Prerequisites
 
-If you just cloned this codebase and didn't use `npm create convex`, run:
+Before you begin, make sure you have:
 
-```
+- Node.js 18+ installed
+- npm or yarn package manager
+- A Clerk account (free)
+- A Convex account (free)
+
+## 🛠️ Setup Instructions
+
+### 1. Clone and Install
+
+```bash
+git clone <your-repo-url>
+cd template-nextjs-clerk
 npm install
+```
+
+### 2. Set Up Convex
+
+1. **Create a Convex account**: Go to [convex.dev](https://convex.dev) and sign up
+2. **Install Convex CLI**:
+   ```bash
+   npm install -g convex
+   ```
+3. **Login to Convex**:
+   ```bash
+   npx convex login
+   ```
+4. **Initialize your project**:
+   ```bash
+   npx convex dev
+   ```
+   - This will create a new Convex project and give you a deployment URL
+   - Copy the deployment URL (it looks like `https://your-project.convex.cloud`)
+
+### 3. Set Up Clerk
+
+1. **Create a Clerk account**: Go to [clerk.com](https://clerk.com) and sign up
+2. **Create a new application** in your Clerk dashboard
+3. **Get your keys** from the Clerk dashboard:
+   - Go to "API Keys" in your Clerk dashboard
+   - Copy the "Publishable key" and "Secret key"
+
+### 4. Configure JWT Template in Clerk
+
+This is **critical** for Clerk to work with Convex:
+
+1. In your Clerk dashboard, go to **"JWT Templates"**
+2. Click **"New template"**
+3. Select **"Convex"** from the list
+4. Name it `convex` (lowercase)
+5. Set the **Issuer** to your Clerk domain (e.g., `https://your-app.clerk.accounts.dev`)
+6. Save the template
+
+### 5. Environment Variables
+
+Create a `.env.local` file in your project root:
+
+```env
+# Convex
+NEXT_PUBLIC_CONVEX_URL=https://your-project.convex.cloud
+
+# Clerk
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
+CLERK_SECRET_KEY=sk_test_...
+```
+
+**Where to find these:**
+- `NEXT_PUBLIC_CONVEX_URL`: From step 2 when you ran `npx convex dev`
+- `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`: Clerk dashboard → API Keys → Publishable key
+- `CLERK_SECRET_KEY`: Clerk dashboard → API Keys → Secret key
+
+### 6. Configure Convex Environment Variables
+
+1. Go to your [Convex dashboard](https://dashboard.convex.dev)
+2. Select your project
+3. Go to **"Settings"** → **"Environment Variables"**
+4. Add this variable:
+   ```
+   CLERK_JWT_ISSUER_DOMAIN=https://your-app.clerk.accounts.dev
+   ```
+   (Replace with your actual Clerk issuer domain from step 4)
+
+### 7. Update Convex Auth Config
+
+Update `convex/auth.config.ts` with your Clerk domain:
+
+```typescript
+export default {
+  providers: [
+    {
+      domain: "https://your-app.clerk.accounts.dev", // Replace with your domain
+      applicationID: "convex",
+    },
+  ]
+};
+```
+
+## 🏃‍♂️ Running the Application
+
+### Development Mode
+
+```bash
+# Run both frontend and backend
 npm run dev
 ```
 
-If you're reading this README on GitHub and want to use this template, run:
+This starts:
+- Next.js frontend at `http://localhost:3000`
+- Convex backend (dashboard opens automatically)
+
+### Individual Services
+
+```bash
+# Frontend only
+npm run dev:frontend
+
+# Backend only
+npm run dev:backend
+```
+
+### Production
+
+```bash
+# Build for production
+npm run build
+
+# Start production server
+npm start
+```
+
+## 🔧 Available Scripts
+
+- `npm run dev` - Start development servers (frontend + backend)
+- `npm run dev:frontend` - Start only Next.js frontend
+- `npm run dev:backend` - Start only Convex backend
+- `npm run build` - Build for production
+- `npm run start` - Start production server
+- `npm run lint` - Run ESLint
+
+## 📁 Project Structure
 
 ```
-npm create convex@latest -- -t nextjs-clerk
+├── app/                 # Next.js pages (App Router)
+├── components/          # React components
+├── convex/             # Backend functions and schema
+│   ├── auth.config.ts  # Clerk authentication config
+│   ├── schema.ts       # Database schema
+│   └── myFunctions.ts  # Server functions
+├── public/             # Static assets
+├── middleware.ts       # Route protection
+└── ...
 ```
 
-Then:
+## 🔐 Authentication Flow
 
-1. Open your app. There should be a "Claim your application" button from Clerk in the bottom right of your app.
-2. Follow the steps to claim your application and link it to this app.
-3. Follow step 3 in the [Convex Clerk onboarding guide](https://docs.convex.dev/auth/clerk#get-started) to create a Convex JWT template.
-4. Uncomment the Clerk provider in `convex/auth.config.ts`
-5. Paste the Issuer URL as `CLERK_JWT_ISSUER_DOMAIN` to your dev deployment environment variable settings on the Convex dashboard (see [docs](https://docs.convex.dev/auth/clerk#configuring-dev-and-prod-instances))
+This template includes:
+- Sign up/Sign in pages via Clerk
+- Protected routes using middleware
+- User session management
+- Integration between Clerk and Convex for authenticated API calls
 
-If you want to sync Clerk user data via webhooks, check out this [example repo](https://github.com/thomasballinger/convex-clerk-users-table/).
+## 🗄️ Database
 
-## Learn more
+Convex provides:
+- Real-time database with TypeScript schema
+- Serverless functions
+- Real-time subscriptions
+- Automatic scaling
 
-To learn more about developing your project with Convex, check out:
+Define your schema in `convex/schema.ts` and create functions in `convex/myFunctions.ts`.
 
-- The [Tour of Convex](https://docs.convex.dev/get-started) for a thorough introduction to Convex principles.
-- The rest of [Convex docs](https://docs.convex.dev/) to learn about all Convex features.
-- [Stack](https://stack.convex.dev/) for in-depth articles on advanced topics.
+## 🆘 Troubleshooting
 
-## Join the community
+### Common Issues
 
-Join thousands of developers building full-stack apps with Convex:
+1. **"Convex client not configured"**
+   - Check your `NEXT_PUBLIC_CONVEX_URL` in `.env.local`
+   - Make sure Convex dev server is running
 
-- Join the [Convex Discord community](https://convex.dev/community) to get help in real-time.
-- Follow [Convex on GitHub](https://github.com/get-convex/), star and contribute to the open-source implementation of Convex.
+2. **Authentication not working**
+   - Verify JWT template is created in Clerk with issuer domain
+   - Check `CLERK_JWT_ISSUER_DOMAIN` in Convex dashboard
+   - Ensure `convex/auth.config.ts` has correct domain
+
+3. **Build errors**
+   - Run `npm run lint` to check for linting issues
+   - Ensure all environment variables are set
+
+### Getting Help
+
+- [Convex Documentation](https://docs.convex.dev)
+- [Clerk Documentation](https://clerk.com/docs)
+- [Next.js Documentation](https://nextjs.org/docs)
+
+## 🚀 Deployment
+
+### Deploy to Vercel
+
+1. Push your code to GitHub
+2. Connect your repo to [Vercel](https://vercel.com)
+3. Add your environment variables in Vercel dashboard
+4. Deploy!
+
+### Deploy Convex
+
+Convex automatically deploys when you push to your main branch. Configure this in your Convex dashboard under "Settings" → "Deploy Settings".
+
+## 📝 License
+
+This project is open source and available under the [MIT License](LICENSE).
+
+---
+
+**Happy coding! 🎉**
+
+For questions or issues, please open a GitHub issue or check the documentation links above.
