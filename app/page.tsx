@@ -3,32 +3,36 @@
 import { Authenticated, Unauthenticated } from "convex/react";
 import { SignUpButton } from "@clerk/nextjs";
 import { SignInButton } from "@clerk/nextjs";
-import { UserButton } from "@clerk/nextjs";
-import TodoDashboard from "@/components/TodoDashboard";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
 
 export default function Home() {
   return (
     <>
-      <header className="sticky top-0 z-10 bg-card border-b border-border">
-        <div className="max-w-6xl mx-auto px-4 py-3 flex justify-between items-center">
-          <div className="flex items-center gap-2">
-            <span className="text-xl font-mona-bold">VIBED</span>
-            <span className="text-xs text-muted-foreground">Productivity</span>
-          </div>
-          <UserButton />
-        </div>
-      </header>
-      <main className="min-h-screen bg-background">
-        <div className="py-12 px-4">
-          <Authenticated>
-            <TodoDashboard />
-          </Authenticated>
-          <Unauthenticated>
-            <SignInForm />
-          </Unauthenticated>
-        </div>
-      </main>
+      <Authenticated>
+        <RedirectToDashboard />
+      </Authenticated>
+      <Unauthenticated>
+        <SignInForm />
+      </Unauthenticated>
     </>
+  );
+}
+
+function RedirectToDashboard() {
+  const router = useRouter();
+
+  useEffect(() => {
+    router.push('/tasks');
+  }, [router]);
+
+  return (
+    <div className="min-h-screen bg-background flex items-center justify-center">
+      <div className="text-center">
+        <span className="text-xl font-mona-bold">VIBED</span>
+        <p className="text-muted-foreground mt-2">Redirecting to tasks...</p>
+      </div>
+    </div>
   );
 }
 
