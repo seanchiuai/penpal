@@ -4,8 +4,9 @@ import * as React from "react"
 import {
   IconHelp,
   IconInnerShadowTop,
-  IconListDetails,
   IconSettings,
+  IconFileText,
+  IconGitBranch,
 } from "@tabler/icons-react"
 
 import { NavMain } from "@/components/nav-main"
@@ -24,9 +25,14 @@ import {
 const data = {
   navMain: [
     {
-      title: "Tasks",
-      url: "/tasks",
-      icon: IconListDetails,
+      title: "Documents",
+      url: "/documents",
+      icon: IconFileText,
+    },
+    {
+      title: "Change Controls",
+      url: "/change-controls",
+      icon: IconGitBranch,
     },
   ],
   navSecondary: [
@@ -53,7 +59,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
               asChild
               className="data-[slot=sidebar-menu-button]:!p-1.5"
             >
-              <a href="/tasks">
+              <a href="/">
                 <IconInnerShadowTop className="!size-5" />
                 <span className="text-base font-semibold">VIBED</span>
               </a>

@@ -1,0 +1,149 @@
+import { ProsemirrorSync } from "@convex-dev/prosemirror-sync";
+import { mutation, query, QueryCtx, MutationCtx } from "./_generated/server";
+import { v } from "convex/values";
+
+// Import components - will be generated after first successful build
+// @ts-ignore - components will be available after initial compilation
+import { components } from "./_generated/api";
+
+// Initialize the ProsemirrorSync component
+const prosemirrorSync = new ProsemirrorSync(
+  // @ts-ignore - components.prosemirrorSync will be available after initial compilation
+  components.prosemirrorSync
+);
+
+// Export the generated API functions with authorization rules
+export const {
+  getSnapshot,
+  submitSnapshot,
+  latestVersion,
+  getSteps,
+  submitSteps,
+} = prosemirrorSync.syncApi({
+  // Define authorization check for reading documents
+  checkRead: async (ctx: QueryCtx, docId: string) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+  },
+  // Define authorization check for writing to documents
+  checkWrite: async (ctx: MutationCtx, docId: string) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+  },
+});
+
+// Mutation to create a new collaborative document
+export const createCollaborativeDoc = mutation({
+  args: {
+    title: v.string(),
+    docId: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+
+    const now = Date.now();
+    await ctx.db.insert("collaborativeDocs", {
+      title: args.title,
+      createdBy: identity.subject,
+      createdAt: now,
+      lastModified: now,
+    });
+
+    return { docId: args.docId };
+  },
+});
+
+// Query to list all collaborative documents for the current user
+export const listCollaborativeDocs = query({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      return [];
+    }
+
+    const docs = await ctx.db
+      .query("collaborativeDocs")
+      .withIndex("by_createdBy", (q) => q.eq("createdBy", identity.subject))
+      .order("desc")
+      .collect();
+
+    return docs;
+  },
+});
+
+// Query to get a single collaborative document by ID
+export const getCollaborativeDoc = query({
+  args: { id: v.id("collaborativeDocs") },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      return null;
+    }
+
+    const doc = await ctx.db.get(args.id);
+    return doc;
+  },
+});
+
+// Mutation to update document metadata (title, lastModified)
+export const updateCollaborativeDoc = mutation({
+  args: {
+    id: v.id("collaborativeDocs"),
+    title: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+
+    const doc = await ctx.db.get(args.id);
+    if (!doc) {
+      throw new Error("Document not found");
+    }
+
+    if (doc.createdBy !== identity.subject) {
+      throw new Error("Not authorized to update this document");
+    }
+
+    const updates: any = {
+      lastModified: Date.now(),
+    };
+
+    if (args.title !== undefined) {
+      updates.title = args.title;
+    }
+
+    await ctx.db.patch(args.id, updates);
+  },
+});
+
+// Mutation to delete a collaborative document
+export const deleteCollaborativeDoc = mutation({
+  args: { id: v.id("collaborativeDocs") },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+
+    const doc = await ctx.db.get(args.id);
+    if (!doc) {
+      throw new Error("Document not found");
+    }
+
+    if (doc.createdBy !== identity.subject) {
+      throw new Error("Not authorized to delete this document");
+    }
+
+    await ctx.db.delete(args.id);
+  },
+});
