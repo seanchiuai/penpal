@@ -1,4 +1,4 @@
-import { query, mutation } from "./_generated/server";
+import { query, mutation, internalMutation, internalQuery } from "./_generated/server";
 import { v } from "convex/values";
 
 /**
@@ -65,6 +65,10 @@ export const createDocument = mutation({
   handler: async (ctx, args) => {
     const now = Date.now();
     const documentId = await ctx.db.insert("documents", {
+      userId: args.userId,
+      title: "Untitled Document",
+      content: args.currentContent,
+      isAIPending: false,
       originalContent: args.originalContent,
       currentContent: args.currentContent,
       status: "draft",
@@ -156,5 +160,235 @@ export const deleteDocument = mutation({
   handler: async (ctx, args) => {
     await ctx.db.delete(args.documentId);
     return null;
+  },
+});
+
+// ========================================
+// Smart Editor Functions
+// ========================================
+
+/**
+ * Create a new document with Smart Editor support
+ */
+export const createSmartDocument = mutation({
+  args: {
+    title: v.string(),
+    content: v.optional(v.string()),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+
+    const documentId = await ctx.db.insert("documents", {
+      userId: identity.subject,
+      title: args.title,
+      content: args.content || "",
+      isAIPending: false,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    });
+
+    return documentId;
+  },
+});
+
+/**
+ * Get a specific document by ID for Smart Editor
+ */
+export const getSmartDocument = query({
+  args: {
+    documentId: v.id("documents"),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+
+    const document = await ctx.db.get(args.documentId);
+    if (!document) {
+      return null;
+    }
+
+    // Ensure user can only access their own documents
+    if (document.userId !== identity.subject) {
+      throw new Error("Unauthorized access to document");
+    }
+
+    return document;
+  },
+});
+
+/**
+ * List all Smart Editor documents for the current user
+ */
+export const listSmartDocuments = query({
+  args: {},
+  handler: async (ctx) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+
+    const documents = await ctx.db
+      .query("documents")
+      .withIndex("by_userId", (q) => q.eq("userId", identity.subject))
+      .order("desc")
+      .collect();
+
+    // Filter to only show documents with Smart Editor fields
+    return documents.filter(doc =>
+      doc.userId !== undefined &&
+      doc.title !== undefined &&
+      doc.content !== undefined
+    );
+  },
+});
+
+/**
+ * Update document content (manual edit by user)
+ */
+export const updateSmartDocumentContent = mutation({
+  args: {
+    documentId: v.id("documents"),
+    newContent: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+
+    const document = await ctx.db.get(args.documentId);
+    if (!document) {
+      throw new Error("Document not found");
+    }
+
+    // Ensure user can only update their own documents
+    if (document.userId !== identity.subject) {
+      throw new Error("Unauthorized access to document");
+    }
+
+    // Update content and clear any pending AI suggestions
+    await ctx.db.patch(args.documentId, {
+      content: args.newContent,
+      isAIPending: false,
+      proposedAIContent: undefined,
+      proposedAIDiff: undefined,
+      updatedAt: Date.now(),
+    });
+
+    return args.documentId;
+  },
+});
+
+/**
+ * Accept AI-suggested changes
+ */
+export const acceptAIChanges = mutation({
+  args: {
+    documentId: v.id("documents"),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+
+    const document = await ctx.db.get(args.documentId);
+    if (!document) {
+      throw new Error("Document not found");
+    }
+
+    // Ensure user can only update their own documents
+    if (document.userId !== identity.subject) {
+      throw new Error("Unauthorized access to document");
+    }
+
+    if (!document.proposedAIContent) {
+      throw new Error("No AI suggestions to accept");
+    }
+
+    // Apply the AI's proposed content
+    await ctx.db.patch(args.documentId, {
+      content: document.proposedAIContent,
+      isAIPending: false,
+      proposedAIContent: undefined,
+      proposedAIDiff: undefined,
+      updatedAt: Date.now(),
+    });
+
+    return args.documentId;
+  },
+});
+
+/**
+ * Reject AI-suggested changes
+ */
+export const rejectAIChanges = mutation({
+  args: {
+    documentId: v.id("documents"),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+
+    const document = await ctx.db.get(args.documentId);
+    if (!document) {
+      throw new Error("Document not found");
+    }
+
+    // Ensure user can only update their own documents
+    if (document.userId !== identity.subject) {
+      throw new Error("Unauthorized access to document");
+    }
+
+    // Clear AI suggestions
+    await ctx.db.patch(args.documentId, {
+      isAIPending: false,
+      proposedAIContent: undefined,
+      proposedAIDiff: undefined,
+      updatedAt: Date.now(),
+    });
+
+    return args.documentId;
+  },
+});
+
+/**
+ * Internal query to get document for AI actions
+ * Bypasses authentication check since actions handle auth
+ */
+export const getDocumentInternal = internalQuery({
+  args: {
+    documentId: v.id("documents"),
+  },
+  handler: async (ctx, args) => {
+    const document = await ctx.db.get(args.documentId);
+    return document;
+  },
+});
+
+/**
+ * Internal mutation to update document with AI suggestions
+ * Called by the sendAIRequest action
+ */
+export const updateWithAISuggestion = internalMutation({
+  args: {
+    documentId: v.id("documents"),
+    proposedContent: v.string(),
+    diffResult: v.string(),
+  },
+  handler: async (ctx, args) => {
+    await ctx.db.patch(args.documentId, {
+      proposedAIContent: args.proposedContent,
+      proposedAIDiff: args.diffResult,
+      isAIPending: true,
+      updatedAt: Date.now(),
+    });
   },
 });

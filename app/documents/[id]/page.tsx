@@ -5,6 +5,7 @@ import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import DocumentEditor from "@/components/DocumentEditor";
+import AISidebar from "@/components/AISidebar";
 import { Button } from "@/components/ui/button";
 import { IconArrowLeft } from "@tabler/icons-react";
 
@@ -40,15 +41,33 @@ export default function DocumentPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto px-4 py-6">
-        <div className="mb-4">
+    <div className="min-h-screen bg-background flex flex-col">
+      {/* Header */}
+      <div className="border-b border-border bg-card">
+        <div className="container mx-auto px-4 py-3">
           <Button variant="ghost" onClick={() => router.push("/")}>
             <IconArrowLeft className="w-4 h-4 mr-2" />
             Back to Home
           </Button>
         </div>
-        <DocumentEditor documentId={documentId} />
+      </div>
+
+      {/* Main Content: Split Layout */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Document Editor - Left Side */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="container mx-auto px-4 py-6 max-w-4xl">
+            <DocumentEditor documentId={documentId} />
+          </div>
+        </div>
+
+        {/* AI Sidebar - Right Side */}
+        <div className="w-96 flex-shrink-0">
+          <AISidebar
+            documentId={documentId}
+            currentContent={document.currentContent}
+          />
+        </div>
       </div>
     </div>
   );

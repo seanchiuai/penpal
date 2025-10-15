@@ -13,10 +13,12 @@ export const createDocument = mutation({
   handler: async (ctx, args) => {
     const now = Date.now();
     const documentId = await ctx.db.insert("documents", {
+      userId: args.userId,
       title: args.title,
       content: args.content,
+      isAIPending: false,
       ownerId: args.userId,
-      // Required fields for Inline Diff schema
+      // Optional legacy fields
       originalContent: args.content,
       currentContent: args.content,
       status: "draft" as const,

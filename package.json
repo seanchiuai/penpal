@@ -11,6 +11,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@ai-sdk/openai": "^2.0.52",
     "@clerk/clerk-react": "^5.25.0",
     "@clerk/nextjs": "^6.12.6",
     "@convex-dev/prosemirror-sync": "^0.1.28",
@@ -36,9 +37,11 @@
     "@tiptap/pm": "^2.26.3",
     "@tiptap/react": "^2.26.3",
     "@tiptap/starter-kit": "^2.26.3",
+    "ai": "^5.0.72",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "convex": "^1.23.0",
+    "diff-match-patch": "^1.0.5",
     "lucide-react": "^0.544.0",
     "next": "^15.5.3",
     "next-themes": "^0.4.6",
@@ -54,6 +57,7 @@
   "devDependencies": {
     "@eslint/eslintrc": "^3",
     "@tailwindcss/postcss": "^4",
+    "@types/diff-match-patch": "^1.0.36",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
