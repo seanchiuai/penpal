@@ -1,12 +1,13 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useMutation, useQuery } from "convex/react";
+import { useMutation, useQuery, useAction } from "convex/react";
 import { useUser } from "@clerk/nextjs";
 import { api } from "../convex/_generated/api";
 import { Id } from "../convex/_generated/dataModel";
 import DiffDisplay from "./DiffDisplay";
 import ChangeActionButtons from "./ChangeActionButtons";
+import InlineSuggestions from "./InlineSuggestions";
 
 interface DocumentEditorProps {
   documentId: Id<"documents">;
@@ -19,11 +20,17 @@ export default function DocumentEditor({ documentId }: DocumentEditorProps) {
   const [viewDiff, setViewDiff] = useState(false);
   const [splitView, setSplitView] = useState(false);
   const [isActionLoading, setIsActionLoading] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [isAILoading, setIsAILoading] = useState(false);
 
   const document = useQuery(api.documents.getDiffContent, { documentId });
+  const aiSuggestion = useQuery(api.aiSuggestions.getLatestPending, { documentId });
   const updateContent = useMutation(api.documents.updateContent);
   const approveChange = useMutation(api.documents.approveChange);
   const rejectChange = useMutation(api.documents.rejectChange);
+  const acceptSuggestion = useMutation(api.aiSuggestions.accept);
+  const rejectSuggestion = useMutation(api.aiSuggestions.reject);
+  const sendAIRequest = useAction(api.aiActions.sendAIRequest);
 
   useEffect(() => {
     if (document) {
@@ -87,6 +94,52 @@ export default function DocumentEditor({ documentId }: DocumentEditorProps) {
       setCurrentText(document.currentContent);
     }
     setEditMode(false);
+  };
+
+  const handleAIRequest = async () => {
+    if (!aiPrompt.trim() || !user) return;
+
+    setIsAILoading(true);
+    try {
+      await sendAIRequest({
+        documentId,
+        prompt: aiPrompt.trim(),
+      });
+      setAiPrompt("");
+    } catch (error) {
+      console.error("Failed to send AI request:", error);
+      alert(error instanceof Error ? error.message : "Failed to generate AI suggestions");
+    } finally {
+      setIsAILoading(false);
+    }
+  };
+
+  const handleAcceptSuggestion = async () => {
+    if (!aiSuggestion?._id) return;
+
+    setIsActionLoading(true);
+    try {
+      await acceptSuggestion({ suggestionId: aiSuggestion._id });
+    } catch (error) {
+      console.error("Failed to accept suggestion:", error);
+      alert(error instanceof Error ? error.message : "Failed to accept suggestion");
+    } finally {
+      setIsActionLoading(false);
+    }
+  };
+
+  const handleRejectSuggestion = async () => {
+    if (!aiSuggestion?._id) return;
+
+    setIsActionLoading(true);
+    try {
+      await rejectSuggestion({ suggestionId: aiSuggestion._id });
+    } catch (error) {
+      console.error("Failed to reject suggestion:", error);
+      alert(error instanceof Error ? error.message : "Failed to reject suggestion");
+    } finally {
+      setIsActionLoading(false);
+    }
   };
 
   if (!document) {
@@ -192,6 +245,74 @@ export default function DocumentEditor({ documentId }: DocumentEditorProps) {
         </div>
       </div>
 
+      {/* AI Prompt Input */}
+      {!editMode && !aiSuggestion && (
+        <div className="bg-card border border-border rounded-lg p-4">
+          <div className="flex items-start gap-3">
+            <div className="flex-1">
+              <label htmlFor="ai-prompt" className="block text-sm font-medium text-foreground mb-2">
+                Ask AI to modify this document
+              </label>
+              <textarea
+                id="ai-prompt"
+                value={aiPrompt}
+                onChange={(e) => setAiPrompt(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                    handleAIRequest();
+                  }
+                }}
+                placeholder="e.g., Make it more concise, Fix grammar, Expand the introduction..."
+                className="w-full min-h-[80px] bg-background border border-border rounded-md px-3 py-2 text-sm resize-y focus:outline-none focus:ring-2 focus:ring-primary"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Press Cmd/Ctrl + Enter to submit
+              </p>
+            </div>
+            <button
+              onClick={handleAIRequest}
+              disabled={!aiPrompt.trim() || isAILoading}
+              className="px-4 py-2 bg-primary text-primary-foreground text-sm font-medium rounded-md hover:opacity-80 disabled:opacity-50 disabled:cursor-not-allowed transition-opacity mt-6"
+            >
+              {isAILoading ? (
+                <span className="flex items-center gap-2">
+                  <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24">
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                      fill="none"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    />
+                  </svg>
+                  Processing...
+                </span>
+              ) : (
+                "Generate"
+              )}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Inline AI Suggestions */}
+      {aiSuggestion && !editMode && (
+        <InlineSuggestions
+          originalContent={document.content || ""}
+          changeGroups={aiSuggestion.changeGroups}
+          onAccept={handleAcceptSuggestion}
+          onReject={handleRejectSuggestion}
+          isLoading={isActionLoading}
+        />
+      )}
+
       {/* Editor or Content Display */}
       {editMode ? (
         <div className="bg-card border border-border rounded-lg p-4">
@@ -222,7 +343,7 @@ export default function DocumentEditor({ documentId }: DocumentEditorProps) {
             />
           </div>
         </div>
-      ) : (
+      ) : !aiSuggestion && (
         <div className="bg-card border border-border rounded-lg p-6">
           <div className="prose prose-sm max-w-none">
             <pre className="whitespace-pre-wrap font-mono text-sm text-foreground bg-transparent">

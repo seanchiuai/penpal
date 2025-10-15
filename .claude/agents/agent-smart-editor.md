@@ -43,21 +43,27 @@ documentation_sources:
 *   **Schema Definition**: Clearly define your Convex schema for documents, users, and any related data (e.g., document metadata, AI suggestions history). Use Convex's `v` (validator) for strong type safety.
 *   **Optimistic Updates**: Implement optimistic UI updates on the frontend to provide an instant feedback loop to users, even before server confirmation. Convex's `useMutation` can be combined with optimistic updates patterns.
 *   **Modular Backend with Components**: The `ProsemirrorSync` component exemplifies using modular Convex backend components. For larger applications, breaking down backend logic into reusable components can improve maintainability.
+*   **Inline Suggestion Rendering**: Use ProseMirror decorations or custom editor extensions to render AI suggestions inline with proper diff highlighting (red for deletions, green for insertions). Ensure suggestions are grouped logically and don't interfere with real-time collaboration.
 
 ## Implementation Steps
 1.  **Initialize Convex Project**: If not already done, create a Convex project and integrate it with your Next.js application.
 2.  **Install `prosemirror-sync` Component**: Add the `@convex-dev/prosemirror-sync` package to your project.
-3.  **Define Schema**: Create a `schema.ts` file in your `convex/` directory to define the `documents` table and any other necessary tables (e.g., `users`).
+3.  **Define Schema**: Create a `schema.ts` file in your `convex/` directory to define the `documents` table, `aiSuggestions` table, and any other necessary tables (e.g., `users`).
 4.  **Expose Component API**: Create a file (e.g., `convex/prosemirrorSync.ts`) to expose the `ProsemirrorSync` component's queries, mutations, and actions. This is where you can add authorization logic.
 5.  **Develop Frontend Editor**: Choose between Tiptap or BlockNote. Implement the editor component in your Next.js frontend.
 6.  **Integrate Frontend with Convex Hooks**: Use `useBlockNoteSync` or `useTiptapSync` from the `@convex-dev/prosemirror-sync` client library to connect your editor to the Convex backend.
-7.  **Implement Smart Features (AI)**: Create Convex Actions for AI integrations (e.g., generating content, proposing edits). Call these actions from your frontend or schedule them as cron jobs.
+7.  **Implement Inline Suggestion Rendering**:
+    *   Create a diff algorithm to compare original text with AI suggestions
+    *   Implement ProseMirror decorations or editor extensions to highlight deletions (red) and insertions (green)
+    *   Group continuous changes together and separate non-continuous changes
+    *   Render all suggestions inline within the document editor
+8.  **Implement Smart Features (AI)**: Create Convex Actions for AI integrations (e.g., generating content, proposing edits). These actions should return structured diff data that can be rendered inline with proper highlighting.
 
 ### Backend Implementation
 The backend implementation centers around the `convex/` directory, utilizing Convex's `queries`, `mutations`, and `actions` to manage document state, handle real-time diffing, and integrate AI capabilities.
 
 #### Convex Functions (Primary)
-*   **`convex/schema.ts`**: Defines the `documents` table with a field to store the editor's content (e.g., `body: v.string()`) and potentially `steps` and `snapshots` if custom handling is needed, though `prosemirror-sync` manages these internally. Also define `users` for authentication/presence.
+*   **`convex/schema.ts`**: Defines the `documents` table with a field to store the editor's content (e.g., `body: v.string()`) and potentially `steps` and `snapshots` if custom handling is needed, though `prosemirror-sync` manages these internally. Also define `users` for authentication/presence. Include an `aiSuggestions` table to store pending inline suggestions with their diff data (deletions and insertions) for rendering.
 *   **`convex/prosemirrorSync.ts`**:
     *   Imports `ProsemirrorSync` from `@convex-dev/prosemirror-sync`.
     *   Initializes `prosemirrorSync` with `components.prosemirrorSync`.
@@ -66,7 +72,12 @@ The backend implementation centers around the `convex/` directory, utilizing Con
     *   Define a Convex `mutation` to create new documents, potentially calling `prosemirrorSync.create(ctx, id, content)` server-side.
 *   **`convex/ai.ts` (Example for Smart Features)**:
     *   Define Convex `actions` (e.g., `proposeContent`, `refineDocument`). These actions will interact with external AI APIs (e.g., OpenAI, Google Gemini) to generate or refine document content.
-    *   These actions will read the current document state (via queries or direct access if invoked by `prosemirrorSync` internally) and then use external APIs to process it. The results can then be applied back to the document via a mutation or proposed to the user.
+    *   These actions will read the current document state (via queries or direct access if invoked by `prosemirrorSync` internally) and then use external APIs to process it.
+    *   **CRITICAL**: Actions should return structured diff data containing:
+        *   Array of change groups (each group represents a continuous modification)
+        *   Each change group contains position info, deletions (text to remove), and insertions (text to add)
+        *   This diff data is stored in the `aiSuggestions` table and rendered inline with proper highlighting
+    *   The results can then be applied to the document via a mutation when the user accepts the suggestion, or dismissed when rejected.
 
 ### Frontend Integration
 The frontend in Next.js will primarily consist of React components that utilize the client-side Convex hooks and editor-specific hooks.
@@ -76,8 +87,14 @@ The frontend in Next.js will primarily consist of React components that utilize 
     *   This component will house the Tiptap or BlockNote editor instance.
     *   It will use `useBlockNoteSync(api.prosemirrorSync, documentId)` or `useTiptapSync(...)` to bind the editor state to the Convex backend.
     *   It will use `useQuery` to fetch document details and `useMutation` to trigger any custom document updates not handled by `prosemirror-sync` directly.
-    *   It will implement UI for AI features, calling Convex Actions (e.g., `useAction(api.ai.proposeContent)`) when users request AI assistance.
-*   **Two-panel Editor Layout**: Implement the two-panel UI where one panel is the editable document (using the `SmartEditor` component) and the other is for AI chat/proposals, interacting with the Convex AI actions.
+    *   It will implement **inline AI suggestion display** with the following behavior:
+        *   **Deletions**: Highlighted in red within the document text
+        *   **Insertions**: Highlighted in green within the document text
+        *   **Continuous modifications**: Deletions and insertions are placed adjacent to each other if the modification is continuous
+        *   **Grouped suggestions**: Continuous changes are grouped together; separate groups are created when there are unchanged words between modifications
+        *   **No sidebar**: All AI suggestions are shown directly in the document editor, not in a separate sidebar
+    *   It will call Convex Actions (e.g., `useAction(api.ai.proposeContent)`) when users request AI assistance.
+*   **Inline Suggestion Rendering**: Implement custom ProseMirror decorations or BlockNote/Tiptap extensions to render deletions (red highlight), insertions (green highlight), and group continuous changes within the editor content.
 
 ## Code Patterns
 
@@ -98,6 +115,26 @@ The frontend in Next.js will primarily consist of React components that utilize 
         tokenIdentifier: v.string(),
         name: v.string(),
       }).index("by_token", ["tokenIdentifier"]),
+      aiSuggestions: defineTable({
+        documentId: v.id("documents"),
+        userId: v.string(),
+        status: v.union(v.literal("pending"), v.literal("accepted"), v.literal("rejected")),
+        changeGroups: v.array(v.object({
+          startPos: v.number(),
+          endPos: v.number(),
+          deletions: v.array(v.object({
+            text: v.string(),
+            position: v.number(),
+          })),
+          insertions: v.array(v.object({
+            text: v.string(),
+            position: v.number(),
+          })),
+        })),
+        createdAt: v.number(),
+      })
+        .index("by_document", ["documentId"])
+        .index("by_document_status", ["documentId", "status"]),
     });
     ```
 2.  **`convex/prosemirrorSync.ts`**:
@@ -188,7 +225,7 @@ The frontend in Next.js will primarily consist of React components that utilize 
     ```
 3.  **`convex/ai.ts` (Example AI Action)**:
     ```typescript
-    import { action } from "./_generated/server";
+    import { action, mutation } from "./_generated/server";
     import { api } from "./_generated/api";
     import { ConvexError, v } from "convex/values";
 
@@ -200,26 +237,104 @@ The frontend in Next.js will primarily consist of React components that utilize 
           throw new ConvexError("Not authenticated for AI action");
         }
 
-        // Fetch document for additional context/auth if needed (using query from another file)
+        // Fetch document for additional context/auth if needed
         const document = await ctx.runQuery(api.prosemirrorSync.getSnapshot, { id: args.documentId });
         if (!document) {
             throw new ConvexError("Document not found for AI processing");
         }
-        // Add more specific authorization here if necessary
 
-        // Simulate external AI API call
+        // Call external AI API to get suggested content
         console.log(`Calling AI for document ${args.documentId} with prompt: ${args.prompt}`);
-        // In a real app, you'd use fetch() to an external AI service
         // const response = await fetch("https://api.openai.com/v1/chat/completions", { /* ... */ });
         // const aiSuggestion = await response.json();
-        await new Promise(resolve => setTimeout(resolve, 2000)); // Simulate AI latency
-        const aiSuggestion = {
-            proposedText: `AI-generated content based on "${args.prompt}": ${args.currentContent.substring(0, 50)}...`,
-            confidence: 0.9
-        };
 
-        // Return the AI suggestion to the frontend
-        return aiSuggestion;
+        // Simulate AI response
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        const suggestedText = `AI-improved: ${args.currentContent.substring(0, 50)}...`;
+
+        // Compute diff between original and suggested text
+        const changeGroups = computeDiff(args.currentContent, suggestedText);
+
+        // Store the suggestion in the database
+        const suggestionId = await ctx.runMutation(api.aiSuggestions.create, {
+          documentId: args.documentId,
+          userId,
+          changeGroups,
+        });
+
+        return { suggestionId, changeGroups };
+      },
+    });
+
+    // Helper function to compute diff (simplified example)
+    function computeDiff(original: string, suggested: string) {
+      // In production, use a proper diff library like diff-match-patch
+      // This is a simplified example
+      const changeGroups = [];
+
+      if (original !== suggested) {
+        changeGroups.push({
+          startPos: 0,
+          endPos: original.length,
+          deletions: [{ text: original, position: 0 }],
+          insertions: [{ text: suggested, position: 0 }],
+        });
+      }
+
+      return changeGroups;
+    }
+    ```
+
+4.  **`convex/aiSuggestions.ts` (Suggestion Management)**:
+    ```typescript
+    import { mutation, query } from "./_generated/server";
+    import { ConvexError, v } from "convex/values";
+
+    export const create = mutation({
+      args: {
+        documentId: v.id("documents"),
+        userId: v.string(),
+        changeGroups: v.array(v.object({
+          startPos: v.number(),
+          endPos: v.number(),
+          deletions: v.array(v.object({ text: v.string(), position: v.number() })),
+          insertions: v.array(v.object({ text: v.string(), position: v.number() })),
+        })),
+      },
+      handler: async (ctx, args) => {
+        return await ctx.db.insert("aiSuggestions", {
+          documentId: args.documentId,
+          userId: args.userId,
+          status: "pending",
+          changeGroups: args.changeGroups,
+          createdAt: Date.now(),
+        });
+      },
+    });
+
+    export const getPending = query({
+      args: { documentId: v.id("documents") },
+      handler: async (ctx, args) => {
+        return await ctx.db
+          .query("aiSuggestions")
+          .withIndex("by_document_status", (q) =>
+            q.eq("documentId", args.documentId).eq("status", "pending")
+          )
+          .collect();
+      },
+    });
+
+    export const accept = mutation({
+      args: { suggestionId: v.id("aiSuggestions") },
+      handler: async (ctx, args) => {
+        await ctx.db.patch(args.suggestionId, { status: "accepted" });
+      },
+    });
+
+    export const reject = mutation({
+      args: { suggestionId: v.id("aiSuggestions") },
+      handler: async (ctx, args) => {
+        await ctx.db.patch(args.suggestionId, { status: "rejected" });
       },
     });
     ```
@@ -241,7 +356,12 @@ The frontend in Next.js will primarily consist of React components that utilize 
 *   **Document Persistence**: Document content is reliably saved and loaded from the Convex database.
 *   **Type Safety**: End-to-end type safety is maintained between Next.js frontend and Convex backend functions.
 *   **Authentication & Authorization**: Only authenticated and authorized users can access and modify documents.
-*   **AI Integration**: AI-powered features (e.g., content proposals) are successfully integrated via Convex Actions and function as expected.
+*   **Inline AI Suggestions**: AI suggestions are displayed inline within the document editor with proper highlighting:
+    *   Deletions are highlighted in red
+    *   Insertions are highlighted in green
+    *   Continuous modifications are grouped together
+    *   Non-continuous changes are separated with unchanged text between them
+*   **No Sidebar**: All AI functionality is integrated directly into the document editor, not in a separate sidebar.
 *   **Scalability**: The system gracefully handles multiple concurrent users editing, with acceptable latency.
 *   **Error Resilience**: The application provides clear feedback and handles errors gracefully during editing and AI interactions.
 ```

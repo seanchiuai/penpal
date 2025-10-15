@@ -7,19 +7,105 @@ import { openai } from "@ai-sdk/openai";
 import { generateText } from "ai";
 import DiffMatchPatch from "diff-match-patch";
 
+// Type definitions for change groups
+type ChangeGroup = {
+  startPos: number;
+  endPos: number;
+  deletions: Array<{ text: string; position: number }>;
+  insertions: Array<{ text: string; position: number }>;
+};
+
+/**
+ * Compute structured diff data from original and suggested content
+ * This groups continuous changes and separates non-continuous ones
+ */
+function computeStructuredDiff(original: string, suggested: string): ChangeGroup[] {
+  const dmp = new DiffMatchPatch();
+  const diffs = dmp.diff_main(original, suggested);
+  dmp.diff_cleanupSemantic(diffs);
+
+  const changeGroups: ChangeGroup[] = [];
+  let currentPos = 0;
+  let currentGroup: ChangeGroup | null = null;
+  let lastChangePos = -1;
+  const GROUPING_THRESHOLD = 20; // Characters - changes within this distance are grouped
+
+  for (const [operation, text] of diffs) {
+    if (operation === 0) {
+      // DIFF_EQUAL - unchanged text
+      currentPos += text.length;
+
+      // If we have a current group and the gap is too large, finalize it
+      if (currentGroup && currentPos - lastChangePos > GROUPING_THRESHOLD) {
+        changeGroups.push(currentGroup);
+        currentGroup = null;
+      }
+    } else if (operation === -1) {
+      // DIFF_DELETE
+      if (!currentGroup || currentPos - lastChangePos > GROUPING_THRESHOLD) {
+        // Start a new group
+        currentGroup = {
+          startPos: currentPos,
+          endPos: currentPos + text.length,
+          deletions: [],
+          insertions: [],
+        };
+      }
+
+      currentGroup.deletions.push({
+        text,
+        position: currentPos,
+      });
+      currentGroup.endPos = currentPos + text.length;
+      lastChangePos = currentPos + text.length;
+      currentPos += text.length;
+    } else if (operation === 1) {
+      // DIFF_INSERT
+      if (!currentGroup || currentPos - lastChangePos > GROUPING_THRESHOLD) {
+        // Start a new group
+        currentGroup = {
+          startPos: currentPos,
+          endPos: currentPos,
+          deletions: [],
+          insertions: [],
+        };
+      }
+
+      currentGroup.insertions.push({
+        text,
+        position: currentPos,
+      });
+      lastChangePos = currentPos;
+      // Don't increment currentPos for insertions
+    }
+  }
+
+  // Add the last group if exists
+  if (currentGroup) {
+    changeGroups.push(currentGroup);
+  }
+
+  return changeGroups;
+}
+
 /**
  * Send an AI request to modify document content
  * This action:
  * 1. Calls OpenAI with the user's prompt and current content
- * 2. Computes the diff between original and AI-suggested content
- * 3. Stores the proposed changes in the database
+ * 2. Computes the structured diff with grouped changes
+ * 3. Stores the inline suggestions in the aiSuggestions table
  */
 export const sendAIRequest = action({
   args: {
     documentId: v.id("documents"),
     prompt: v.string(),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<{
+    success: boolean;
+    message: string;
+    suggestionId: any;
+    changeGroupCount: number;
+  }> => {
     // Verify authentication
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) {
@@ -28,7 +114,7 @@ export const sendAIRequest = action({
 
     try {
       // Get the current document content
-      const document = await ctx.runQuery(internal.documents.getDocumentInternal, {
+      const document: any = await ctx.runQuery(internal.documents.getDocumentInternal, {
         documentId: args.documentId,
       });
 
@@ -60,15 +146,22 @@ Please provide the complete modified version of the document. Return ONLY the mo
 
       const proposedContent = result.text.trim();
 
-      // Compute diff using diff-match-patch
+      // Compute structured diff with grouped changes
+      const changeGroups = computeStructuredDiff(originalContent, proposedContent);
+
+      // Store the inline suggestion using internal mutation
+      const suggestionId: any = await ctx.runMutation(internal.aiSuggestions.createInternal, {
+        documentId: args.documentId,
+        userId: identity.subject,
+        changeGroups,
+      });
+
+      // Also update the legacy format for backward compatibility
       const dmp = new DiffMatchPatch();
       const diffs = dmp.diff_main(originalContent, proposedContent);
       dmp.diff_cleanupSemantic(diffs);
-
-      // Serialize the diff result to JSON for storage
       const diffResult = JSON.stringify(diffs);
 
-      // Update the document with AI suggestions using internal mutation
       await ctx.runMutation(internal.documents.updateWithAISuggestion, {
         documentId: args.documentId,
         proposedContent,
@@ -78,6 +171,8 @@ Please provide the complete modified version of the document. Return ONLY the mo
       return {
         success: true,
         message: "AI suggestions generated successfully",
+        suggestionId,
+        changeGroupCount: changeGroups.length,
       };
     } catch (error) {
       console.error("AI request error:", error);
@@ -108,14 +203,19 @@ export const sendAdvancedAIRequest = action({
     prompt: v.string(),
     systemPrompt: v.optional(v.string()),
   },
-  handler: async (ctx, args) => {
+  handler: async (ctx, args): Promise<{
+    success: boolean;
+    message: string;
+    suggestionId: any;
+    changeGroupCount: number;
+  }> => {
     const identity = await ctx.auth.getUserIdentity();
     if (!identity) {
       throw new Error("Not authenticated");
     }
 
     try {
-      const document = await ctx.runQuery(internal.documents.getDocumentInternal, {
+      const document: any = await ctx.runQuery(internal.documents.getDocumentInternal, {
         documentId: args.documentId,
       });
 
@@ -149,11 +249,20 @@ Provide the complete revised document. Return ONLY the document content without 
 
       const proposedContent = result.text.trim();
 
-      // Compute diff
+      // Compute structured diff with grouped changes
+      const changeGroups = computeStructuredDiff(originalContent, proposedContent);
+
+      // Store the inline suggestion
+      const suggestionId: any = await ctx.runMutation(internal.aiSuggestions.createInternal, {
+        documentId: args.documentId,
+        userId: identity.subject,
+        changeGroups,
+      });
+
+      // Also update the legacy format for backward compatibility
       const dmp = new DiffMatchPatch();
       const diffs = dmp.diff_main(originalContent, proposedContent);
       dmp.diff_cleanupSemantic(diffs);
-
       const diffResult = JSON.stringify(diffs);
 
       await ctx.runMutation(internal.documents.updateWithAISuggestion, {
@@ -165,6 +274,8 @@ Provide the complete revised document. Return ONLY the document content without 
       return {
         success: true,
         message: "Advanced AI suggestions generated successfully",
+        suggestionId,
+        changeGroupCount: changeGroups.length,
       };
     } catch (error) {
       console.error("Advanced AI request error:", error);

@@ -5,7 +5,6 @@ import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import DocumentEditor from "@/components/DocumentEditor";
-import AISidebar from "@/components/AISidebar";
 import { Button } from "@/components/ui/button";
 import { IconArrowLeft } from "@tabler/icons-react";
 
@@ -52,21 +51,10 @@ export default function DocumentPage() {
         </div>
       </div>
 
-      {/* Main Content: Split Layout */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Document Editor - Left Side */}
-        <div className="flex-1 overflow-y-auto">
-          <div className="container mx-auto px-4 py-6 max-w-4xl">
-            <DocumentEditor documentId={documentId} />
-          </div>
-        </div>
-
-        {/* AI Sidebar - Right Side */}
-        <div className="w-96 flex-shrink-0">
-          <AISidebar
-            documentId={documentId}
-            currentContent={document.currentContent}
-          />
+      {/* Main Content: Full Width */}
+      <div className="flex-1 overflow-y-auto">
+        <div className="container mx-auto px-4 py-6 max-w-5xl">
+          <DocumentEditor documentId={documentId} />
         </div>
       </div>
     </div>

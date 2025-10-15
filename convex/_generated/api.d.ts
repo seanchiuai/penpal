@@ -14,6 +14,7 @@ import type {
   FunctionReference,
 } from "convex/server";
 import type * as aiActions from "../aiActions.js";
+import type * as aiSuggestions from "../aiSuggestions.js";
 import type * as changeControlChanges from "../changeControlChanges.js";
 import type * as changeControlDocuments from "../changeControlDocuments.js";
 import type * as documents from "../documents.js";
@@ -31,6 +32,7 @@ import type * as suggestionQueries from "../suggestionQueries.js";
  */
 declare const fullApi: ApiFromModules<{
   aiActions: typeof aiActions;
+  aiSuggestions: typeof aiSuggestions;
   changeControlChanges: typeof changeControlChanges;
   changeControlDocuments: typeof changeControlDocuments;
   documents: typeof documents;

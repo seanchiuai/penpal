@@ -82,4 +82,24 @@ export default defineSchema({
   })
     .index("by_documentId", ["documentId"])
     .index("by_documentId_and_status", ["documentId", "status"]),
+  aiSuggestions: defineTable({
+    documentId: v.id("documents"),
+    userId: v.string(),
+    status: v.union(v.literal("pending"), v.literal("accepted"), v.literal("rejected")),
+    changeGroups: v.array(v.object({
+      startPos: v.number(),
+      endPos: v.number(),
+      deletions: v.array(v.object({
+        text: v.string(),
+        position: v.number(),
+      })),
+      insertions: v.array(v.object({
+        text: v.string(),
+        position: v.number(),
+      })),
+    })),
+    createdAt: v.number(),
+  })
+    .index("by_document", ["documentId"])
+    .index("by_document_status", ["documentId", "status"]),
 });
