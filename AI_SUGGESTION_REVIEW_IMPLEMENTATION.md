@@ -194,7 +194,6 @@ The feature requires an OpenAI API key to be configured in the Convex dashboard:
 5. **Custom AI Models:** Allow users to choose different AI models
 6. **Streaming Responses:** Use `streamText` instead of `generateText` for real-time feedback
 7. **Multi-language Support:** Add support for different languages
-8. **Collaborative Suggestions:** Allow multiple users to review suggestions
 
 ## Architecture Decisions
 

@@ -215,9 +215,9 @@ NEXT_PUBLIC_CONVEX_URL=https://your-deployment.convex.cloud
 3. **Rich text editor** - Support for formatting, links, images
 4. **Model selection** - Let users choose AI model (GPT-4, Claude, etc.)
 5. **Version history** - Track document revisions over time
-6. **Collaborative editing** - Multiple users editing same document
-7. **Export/Import** - Download as PDF, Markdown, DOCX
-8. **AI chat history** - Store conversation with AI for context
+6. **Export/Import** - Download as PDF, Markdown, DOCX
+7. **AI chat history** - Store conversation with AI for context
+8. **Batch operations** - Process multiple documents at once
 
 ## Performance Considerations
 

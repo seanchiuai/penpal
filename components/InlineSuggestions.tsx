@@ -33,7 +33,15 @@ export default function InlineSuggestions({
 }: InlineSuggestionsProps) {
   /**
    * Render the content with inline suggestions
-   * This breaks down the text into segments with proper highlighting
+   * Shows the COMPLETE original text with AI suggestions overlaid:
+   * - All original unchanged text is visible in normal color
+   * - Deletions are shown in red with strikethrough
+   * - Insertions are shown in green right after deletions
+   *
+   * Algorithm:
+   * 1. Walk through original text position by position
+   * 2. When we hit a change group, show: unchanged text before it, then deletions, then insertions
+   * 3. Continue until all text is rendered
    */
   const renderContentWithSuggestions = () => {
     if (!changeGroups || changeGroups.length === 0) {
@@ -47,10 +55,16 @@ export default function InlineSuggestions({
     // Sort change groups by startPos to process them in order
     const sortedGroups = [...changeGroups].sort((a, b) => a.startPos - b.startPos);
 
+    console.log("Original content length:", originalContent.length);
+    console.log("Change groups:", sortedGroups);
+
     for (const group of sortedGroups) {
-      // Add unchanged text before this group
+      console.log(`Processing group at pos ${group.startPos}-${group.endPos}, currentPos: ${currentPos}`);
+
+      // 1. Add ALL unchanged text BEFORE this change group
       if (currentPos < group.startPos) {
         const unchangedText = originalContent.substring(currentPos, group.startPos);
+        console.log(`Adding unchanged text from ${currentPos} to ${group.startPos}: "${unchangedText}"`);
         segments.push(
           <span key={`unchanged-${segmentKey++}`} className="text-foreground">
             {unchangedText}
@@ -58,17 +72,15 @@ export default function InlineSuggestions({
         );
       }
 
-      // Render the change group
-      const groupSegments: JSX.Element[] = [];
-
-      // Add deletions (red highlight)
+      // 2. Show ALL deletions (red strikethrough) - this is the original text being removed
       if (group.deletions && group.deletions.length > 0) {
         for (const deletion of group.deletions) {
-          groupSegments.push(
+          console.log(`Adding deletion at ${deletion.position}: "${deletion.text}"`);
+          segments.push(
             <span
               key={`deletion-${segmentKey++}`}
               className="bg-red-100 text-red-800 line-through dark:bg-red-900/30 dark:text-red-300"
-              title="Deletion suggested by AI"
+              title="AI suggests removing this text"
             >
               {deletion.text}
             </span>
@@ -76,14 +88,15 @@ export default function InlineSuggestions({
         }
       }
 
-      // Add insertions (green highlight) - placed adjacent to deletions if continuous
+      // 3. Show ALL insertions (green) - this is new text being added
       if (group.insertions && group.insertions.length > 0) {
         for (const insertion of group.insertions) {
-          groupSegments.push(
+          console.log(`Adding insertion at ${insertion.position}: "${insertion.text}"`);
+          segments.push(
             <span
               key={`insertion-${segmentKey++}`}
               className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300"
-              title="Insertion suggested by AI"
+              title="AI suggests adding this text"
             >
               {insertion.text}
             </span>
@@ -91,20 +104,16 @@ export default function InlineSuggestions({
         }
       }
 
-      // Wrap the group in a container
-      segments.push(
-        <span key={`group-${group.startPos}-${segmentKey++}`} className="inline">
-          {groupSegments}
-        </span>
-      );
-
-      // Update current position
-      currentPos = Math.max(currentPos, group.endPos);
+      // 4. Update position: we've now processed up to the end of this group's deletions
+      // Use the group's endPos which represents where deletions end in the original
+      currentPos = group.endPos;
+      console.log(`After group, currentPos updated to: ${currentPos}`);
     }
 
-    // Add any remaining unchanged text
+    // 5. Add ALL remaining unchanged text at the END
     if (currentPos < originalContent.length) {
       const remainingText = originalContent.substring(currentPos);
+      console.log(`Adding final unchanged text from ${currentPos} to end: "${remainingText}"`);
       segments.push(
         <span key={`unchanged-end-${segmentKey++}`} className="text-foreground">
           {remainingText}
@@ -112,6 +121,7 @@ export default function InlineSuggestions({
       );
     }
 
+    console.log(`Rendered ${segments.length} segments`);
     return segments;
   };
 

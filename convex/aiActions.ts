@@ -17,7 +17,11 @@ type ChangeGroup = {
 
 /**
  * Compute structured diff data from original and suggested content
- * This groups continuous changes and separates non-continuous ones
+ * Returns change groups where each group contains deletions and insertions at specific positions
+ * Positions are relative to the ORIGINAL text
+ *
+ * SIMPLIFIED APPROACH: Each change (delete/insert pair) gets its own group
+ * This ensures position tracking is always accurate
  */
 function computeStructuredDiff(original: string, suggested: string): ChangeGroup[] {
   const dmp = new DiffMatchPatch();
@@ -25,65 +29,67 @@ function computeStructuredDiff(original: string, suggested: string): ChangeGroup
   dmp.diff_cleanupSemantic(diffs);
 
   const changeGroups: ChangeGroup[] = [];
-  let currentPos = 0;
-  let currentGroup: ChangeGroup | null = null;
-  let lastChangePos = -1;
-  const GROUPING_THRESHOLD = 20; // Characters - changes within this distance are grouped
+  let currentPosInOriginal = 0;
+
+  // Track pending changes to group deletions and insertions that happen together
+  let pendingDeletions: Array<{ text: string; position: number }> = [];
+  let pendingInsertions: Array<{ text: string; position: number }> = [];
+  let groupStartPos = 0;
+  let groupEndPos = 0;
+
+  const flushPendingGroup = () => {
+    if (pendingDeletions.length > 0 || pendingInsertions.length > 0) {
+      changeGroups.push({
+        startPos: groupStartPos,
+        endPos: groupEndPos,
+        deletions: pendingDeletions,
+        insertions: pendingInsertions,
+      });
+      pendingDeletions = [];
+      pendingInsertions = [];
+    }
+  };
 
   for (const [operation, text] of diffs) {
     if (operation === 0) {
       // DIFF_EQUAL - unchanged text
-      currentPos += text.length;
+      // Finalize any pending group before this unchanged text
+      flushPendingGroup();
 
-      // If we have a current group and the gap is too large, finalize it
-      if (currentGroup && currentPos - lastChangePos > GROUPING_THRESHOLD) {
-        changeGroups.push(currentGroup);
-        currentGroup = null;
-      }
+      // Move position forward
+      currentPosInOriginal += text.length;
     } else if (operation === -1) {
-      // DIFF_DELETE
-      if (!currentGroup || currentPos - lastChangePos > GROUPING_THRESHOLD) {
+      // DIFF_DELETE - text removed from original
+      if (pendingDeletions.length === 0) {
         // Start a new group
-        currentGroup = {
-          startPos: currentPos,
-          endPos: currentPos + text.length,
-          deletions: [],
-          insertions: [],
-        };
+        groupStartPos = currentPosInOriginal;
       }
 
-      currentGroup.deletions.push({
+      pendingDeletions.push({
         text,
-        position: currentPos,
+        position: currentPosInOriginal,
       });
-      currentGroup.endPos = currentPos + text.length;
-      lastChangePos = currentPos + text.length;
-      currentPos += text.length;
+
+      groupEndPos = currentPosInOriginal + text.length;
+      currentPosInOriginal += text.length;
     } else if (operation === 1) {
-      // DIFF_INSERT
-      if (!currentGroup || currentPos - lastChangePos > GROUPING_THRESHOLD) {
-        // Start a new group
-        currentGroup = {
-          startPos: currentPos,
-          endPos: currentPos,
-          deletions: [],
-          insertions: [],
-        };
+      // DIFF_INSERT - text added in suggested version
+      if (pendingDeletions.length === 0 && pendingInsertions.length === 0) {
+        // Pure insertion with no preceding deletion
+        groupStartPos = currentPosInOriginal;
+        groupEndPos = currentPosInOriginal;
       }
 
-      currentGroup.insertions.push({
+      pendingInsertions.push({
         text,
-        position: currentPos,
+        position: currentPosInOriginal,
       });
-      lastChangePos = currentPos;
-      // Don't increment currentPos for insertions
+      // Don't increment position for insertions
     }
   }
 
-  // Add the last group if exists
-  if (currentGroup) {
-    changeGroups.push(currentGroup);
-  }
+  // Flush any remaining pending group
+  flushPendingGroup();
 
   return changeGroups;
 }
