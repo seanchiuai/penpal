@@ -59,6 +59,16 @@ export function DocumentEditor({
     try {
       const diffs: [number, string][] = JSON.parse(proposedAIDiff);
 
+      // Debug logging to see what we're receiving
+      console.log("Total diff segments:", diffs.length);
+      const unchangedCount = diffs.filter(([type]) => type === 0).length;
+      const deletionCount = diffs.filter(([type]) => type === -1).length;
+      const insertionCount = diffs.filter(([type]) => type === 1).length;
+      console.log(`Unchanged: ${unchangedCount}, Deletions: ${deletionCount}, Insertions: ${insertionCount}`);
+
+      // Log first few segments to debug
+      console.log("First 3 diff segments:", diffs.slice(0, 3));
+
       return (
         <div className="space-y-2">
           <div className="text-sm font-medium text-muted-foreground mb-2">
@@ -89,7 +99,7 @@ export function DocumentEditor({
                   </span>
                 );
               } else {
-                // Unchanged
+                // Unchanged (type === 0)
                 return (
                   <span key={index} className="text-foreground">
                     {text}

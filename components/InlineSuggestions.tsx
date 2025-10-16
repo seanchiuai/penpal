@@ -44,8 +44,16 @@ export default function InlineSuggestions({
    * 3. Continue until all text is rendered
    */
   const renderContentWithSuggestions = () => {
+    // If no change groups, just show the original content as-is
     if (!changeGroups || changeGroups.length === 0) {
+      console.log("No change groups, showing original content");
       return <span className="text-foreground">{originalContent}</span>;
+    }
+
+    // If original content is empty, nothing to show
+    if (!originalContent) {
+      console.log("No original content to display");
+      return <span className="text-muted-foreground">No content</span>;
     }
 
     const segments: JSX.Element[] = [];
@@ -55,21 +63,28 @@ export default function InlineSuggestions({
     // Sort change groups by startPos to process them in order
     const sortedGroups = [...changeGroups].sort((a, b) => a.startPos - b.startPos);
 
+    console.log("=== InlineSuggestions Render Debug ===");
     console.log("Original content length:", originalContent.length);
-    console.log("Change groups:", sortedGroups);
+    console.log("Original content preview:", originalContent.substring(0, 100) + "...");
+    console.log("Number of change groups:", sortedGroups.length);
+    console.log("Change groups:", JSON.stringify(sortedGroups, null, 2));
 
     for (const group of sortedGroups) {
-      console.log(`Processing group at pos ${group.startPos}-${group.endPos}, currentPos: ${currentPos}`);
+      console.log(`\n[Group] Processing position ${group.startPos}-${group.endPos}, currentPos: ${currentPos}`);
+      console.log(`[Group] Deletions: ${group.deletions.length}, Insertions: ${group.insertions.length}`);
 
       // 1. Add ALL unchanged text BEFORE this change group
       if (currentPos < group.startPos) {
         const unchangedText = originalContent.substring(currentPos, group.startPos);
-        console.log(`Adding unchanged text from ${currentPos} to ${group.startPos}: "${unchangedText}"`);
+        console.log(`[Unchanged] Adding ${unchangedText.length} chars from ${currentPos} to ${group.startPos}`);
+        console.log(`[Unchanged] Text preview: "${unchangedText.substring(0, 50)}..."`);
         segments.push(
           <span key={`unchanged-${segmentKey++}`} className="text-foreground">
             {unchangedText}
           </span>
         );
+      } else if (currentPos > group.startPos) {
+        console.warn(`[Warning] currentPos (${currentPos}) is beyond group.startPos (${group.startPos})! This might cause text to be skipped.`);
       }
 
       // 2. Show ALL deletions (red strikethrough) - this is the original text being removed
@@ -113,15 +128,33 @@ export default function InlineSuggestions({
     // 5. Add ALL remaining unchanged text at the END
     if (currentPos < originalContent.length) {
       const remainingText = originalContent.substring(currentPos);
-      console.log(`Adding final unchanged text from ${currentPos} to end: "${remainingText}"`);
+      console.log(`\n[Final] Adding ${remainingText.length} chars of remaining text from ${currentPos} to end`);
+      console.log(`[Final] Text preview: "${remainingText.substring(0, 50)}..."`);
       segments.push(
         <span key={`unchanged-end-${segmentKey++}`} className="text-foreground">
           {remainingText}
         </span>
       );
+    } else if (currentPos > originalContent.length) {
+      console.error(`[Error] currentPos (${currentPos}) exceeds original content length (${originalContent.length})!`);
     }
 
-    console.log(`Rendered ${segments.length} segments`);
+    console.log(`\n=== Render Summary ===`);
+    console.log(`Total segments rendered: ${segments.length}`);
+    console.log(`Original content length: ${originalContent.length}`);
+    console.log(`Final currentPos: ${currentPos}`);
+
+    // Calculate total rendered length for validation
+    const totalLength = segments.reduce((acc, seg) => {
+      const text = seg.props.children;
+      return acc + (typeof text === 'string' ? text.length : 0);
+    }, 0);
+    console.log(`Total rendered text length: ${totalLength}`);
+
+    if (totalLength < originalContent.length) {
+      console.error(`[Error] Some text was NOT rendered! Missing ${originalContent.length - totalLength} characters.`);
+    }
+
     return segments;
   };
 

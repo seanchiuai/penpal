@@ -305,7 +305,7 @@ export default function DocumentEditor({ documentId }: DocumentEditorProps) {
       {/* Inline AI Suggestions */}
       {aiSuggestion && !editMode && (
         <InlineSuggestions
-          originalContent={document.content || ""}
+          originalContent={document.currentContent || ""}
           changeGroups={aiSuggestion.changeGroups}
           onAccept={handleAcceptSuggestion}
           onReject={handleRejectSuggestion}

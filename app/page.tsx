@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { IconSparkles, IconFileText } from "@tabler/icons-react";
+import { DocumentList } from "@/components/DocumentList";
 
 export default function Home() {
   return (
@@ -97,6 +98,10 @@ function TextEditorHome() {
             </div>
           </CardContent>
         </Card>
+
+        <div className="mb-6">
+          <DocumentList />
+        </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
           <Card>

@@ -15,6 +15,7 @@ export const getDiffContent = query({
     }
     return {
       _id: document._id,
+      content: document.content, // Add content field for InlineSuggestions
       originalContent: document.originalContent,
       currentContent: document.currentContent,
       status: document.status,

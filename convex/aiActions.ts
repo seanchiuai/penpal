@@ -164,8 +164,19 @@ Please provide the complete modified version of the document. Return ONLY the mo
 
       // Also update the legacy format for backward compatibility
       const dmp = new DiffMatchPatch();
+      // Set timeout to 0 for unlimited time to ensure accurate diffs
+      dmp.Diff_Timeout = 0;
       const diffs = dmp.diff_main(originalContent, proposedContent);
+      // Use cleanupSemantic to make diffs more readable while preserving ALL unchanged text
       dmp.diff_cleanupSemantic(diffs);
+
+      // Debug logging
+      console.log("Generated diff segments:", diffs.length);
+      const unchangedCount = diffs.filter(([type]) => type === 0).length;
+      const deletionCount = diffs.filter(([type]) => type === -1).length;
+      const insertionCount = diffs.filter(([type]) => type === 1).length;
+      console.log(`Unchanged: ${unchangedCount}, Deletions: ${deletionCount}, Insertions: ${insertionCount}`);
+
       const diffResult = JSON.stringify(diffs);
 
       await ctx.runMutation(internal.documents.updateWithAISuggestion, {
@@ -267,8 +278,19 @@ Provide the complete revised document. Return ONLY the document content without 
 
       // Also update the legacy format for backward compatibility
       const dmp = new DiffMatchPatch();
+      // Set timeout to 0 for unlimited time to ensure accurate diffs
+      dmp.Diff_Timeout = 0;
       const diffs = dmp.diff_main(originalContent, proposedContent);
+      // Use cleanupSemantic to make diffs more readable while preserving ALL unchanged text
       dmp.diff_cleanupSemantic(diffs);
+
+      // Debug logging
+      console.log("Generated diff segments:", diffs.length);
+      const unchangedCount = diffs.filter(([type]) => type === 0).length;
+      const deletionCount = diffs.filter(([type]) => type === -1).length;
+      const insertionCount = diffs.filter(([type]) => type === 1).length;
+      console.log(`Unchanged: ${unchangedCount}, Deletions: ${deletionCount}, Insertions: ${insertionCount}`);
+
       const diffResult = JSON.stringify(diffs);
 
       await ctx.runMutation(internal.documents.updateWithAISuggestion, {

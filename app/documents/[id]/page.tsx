@@ -1,17 +1,24 @@
 "use client";
 
-import { useParams, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useQuery } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { Id } from "@/convex/_generated/dataModel";
 import DocumentEditor from "@/components/DocumentEditor";
 import { Button } from "@/components/ui/button";
 import { IconArrowLeft } from "@tabler/icons-react";
+import { use } from "react";
 
-export default function DocumentPage() {
-  const params = useParams();
+interface PageProps {
+  params: Promise<{
+    id: string;
+  }>;
+}
+
+export default function DocumentPage({ params }: PageProps) {
   const router = useRouter();
-  const documentId = params.id as Id<"documents">;
+  const { id } = use(params);
+  const documentId = id as Id<"documents">;
 
   const document = useQuery(api.documents.getDiffContent, { documentId });
 

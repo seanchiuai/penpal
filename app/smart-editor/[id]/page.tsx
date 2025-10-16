@@ -3,7 +3,7 @@
 import { useQuery, useMutation, useAction } from "convex/react";
 import { api } from "@/convex/_generated/api";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, use } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ArrowLeft, FileText, Loader2 } from "lucide-react";
@@ -13,14 +13,15 @@ import { AIChatSidebar } from "@/components/smart-editor/AIChatSidebar";
 import { Id } from "@/convex/_generated/dataModel";
 
 interface PageProps {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 }
 
 export default function SmartEditorPage({ params }: PageProps) {
   const router = useRouter();
-  const documentId = params.id as Id<"documents">;
+  const { id } = use(params);
+  const documentId = id as Id<"documents">;
 
   const document = useQuery(api.documents.getSmartDocument, { documentId });
   const updateContent = useMutation(api.documents.updateSmartDocumentContent);
