@@ -124,35 +124,35 @@ export function DocumentEditor({
     <div className="h-full flex flex-col">
       <div className="flex-1 flex flex-col space-y-4">
         {/* Show diff view if AI suggestions are pending */}
-        {isAIPending && proposedAIDiff && (
-          <div className="border-b pb-4">
+        {isAIPending && proposedAIDiff ? (
+          <div className="flex-1">
             {renderDiffView()}
           </div>
-        )}
-
-        {/* Editor */}
-        <div className="flex-1 flex flex-col">
-          <div className="flex items-center justify-between mb-2">
-            <label className="text-sm font-medium text-muted-foreground">
-              {isAIPending ? "Current Content" : "Document Content"}
-            </label>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleSave}
-              disabled={isSaving || editedContent === content}
-            >
-              <Save className="h-4 w-4 mr-2" />
-              {isSaving ? "Saving..." : "Save"}
-            </Button>
+        ) : (
+          /* Editor - only shown when no AI suggestions are pending */
+          <div className="flex-1 flex flex-col">
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-sm font-medium text-muted-foreground">
+                Document Content
+              </label>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleSave}
+                disabled={isSaving || editedContent === content}
+              >
+                <Save className="h-4 w-4 mr-2" />
+                {isSaving ? "Saving..." : "Save"}
+              </Button>
+            </div>
+            <Textarea
+              value={editedContent}
+              onChange={(e) => setEditedContent(e.target.value)}
+              className="flex-1 min-h-[400px] font-mono text-sm resize-none"
+              placeholder="Start typing your document..."
+            />
           </div>
-          <Textarea
-            value={editedContent}
-            onChange={(e) => setEditedContent(e.target.value)}
-            className="flex-1 min-h-[400px] font-mono text-sm resize-none"
-            placeholder="Start typing your document..."
-          />
-        </div>
+        )}
       </div>
     </div>
   );
