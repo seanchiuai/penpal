@@ -361,6 +361,40 @@ export const rejectAIChanges = mutation({
 });
 
 /**
+ * Update document title
+ */
+export const updateSmartDocumentTitle = mutation({
+  args: {
+    documentId: v.id("documents"),
+    newTitle: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+
+    const document = await ctx.db.get(args.documentId);
+    if (!document) {
+      throw new Error("Document not found");
+    }
+
+    // Ensure user can only update their own documents
+    if (document.userId !== identity.subject) {
+      throw new Error("Unauthorized access to document");
+    }
+
+    // Update title
+    await ctx.db.patch(args.documentId, {
+      title: args.newTitle,
+      updatedAt: Date.now(),
+    });
+
+    return args.documentId;
+  },
+});
+
+/**
  * Internal query to get document for AI actions
  * Bypasses authentication check since actions handle auth
  */

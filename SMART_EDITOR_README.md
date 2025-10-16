@@ -205,19 +205,24 @@ NEXT_PUBLIC_CONVEX_URL=https://your-deployment.convex.cloud
 
 ### Current Limitations
 1. **No streaming responses** - Users must wait for complete AI response
-2. **All-or-nothing accept/reject** - Cannot accept individual changes
-3. **Limited to text content** - No rich formatting support yet
-4. **Single AI model** - Uses gpt-4o-mini for all requests
+2. **Limited to text content** - No rich formatting support yet
+3. **Single AI model** - Uses gpt-4o-mini for all requests
+
+### ✅ Recently Implemented (October 2025)
+- **Granular change control** - Hover over individual changes to accept/reject them using Radix UI Popover
+- **Full content display** - See complete document with inline highlighted changes, not just change snippets
+- See `/HOVER_ACCEPT_REJECT_IMPLEMENTATION.md` for complete details
 
 ### Suggested Enhancements
 1. **Streaming AI responses** - Show progress as AI generates content
-2. **Granular change control** - Accept/reject individual diff chunks
-3. **Rich text editor** - Support for formatting, links, images
-4. **Model selection** - Let users choose AI model (GPT-4, Claude, etc.)
-5. **Version history** - Track document revisions over time
-6. **Export/Import** - Download as PDF, Markdown, DOCX
-7. **AI chat history** - Store conversation with AI for context
-8. **Batch operations** - Process multiple documents at once
+2. **Rich text editor** - Support for formatting, links, images
+3. **Model selection** - Let users choose AI model (GPT-4, Claude, etc.)
+4. **Version history** - Track document revisions over time
+5. **Export/Import** - Download as PDF, Markdown, DOCX
+6. **AI chat history** - Store conversation with AI for context
+7. **Batch operations** - Process multiple documents at once
+8. **Keyboard shortcuts** - Press 'a' to accept, 'r' to reject focused changes
+9. **Mobile touch support** - Tap-based accept/reject for touch devices
 
 ## Performance Considerations
 

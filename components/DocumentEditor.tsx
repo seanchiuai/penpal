@@ -28,8 +28,10 @@ export default function DocumentEditor({ documentId }: DocumentEditorProps) {
   const updateContent = useMutation(api.documents.updateContent);
   const approveChange = useMutation(api.documents.approveChange);
   const rejectChange = useMutation(api.documents.rejectChange);
-  const acceptSuggestion = useMutation(api.aiSuggestions.accept);
-  const rejectSuggestion = useMutation(api.aiSuggestions.reject);
+  const acceptPendingChangeGroups = useMutation(api.aiSuggestions.acceptPendingChangeGroups);
+  const rejectPendingChangeGroups = useMutation(api.aiSuggestions.rejectPendingChangeGroups);
+  const acceptChangeGroup = useMutation(api.aiSuggestions.acceptChangeGroup);
+  const rejectChangeGroup = useMutation(api.aiSuggestions.rejectChangeGroup);
   const sendAIRequest = useAction(api.aiActions.sendAIRequest);
 
   useEffect(() => {
@@ -114,31 +116,59 @@ export default function DocumentEditor({ documentId }: DocumentEditorProps) {
     }
   };
 
-  const handleAcceptSuggestion = async () => {
+  const handleAcceptAllPending = async () => {
     if (!aiSuggestion?._id) return;
 
     setIsActionLoading(true);
     try {
-      await acceptSuggestion({ suggestionId: aiSuggestion._id });
+      await acceptPendingChangeGroups({ suggestionId: aiSuggestion._id });
     } catch (error) {
-      console.error("Failed to accept suggestion:", error);
-      alert(error instanceof Error ? error.message : "Failed to accept suggestion");
+      console.error("Failed to accept pending changes:", error);
+      alert(error instanceof Error ? error.message : "Failed to accept pending changes");
     } finally {
       setIsActionLoading(false);
     }
   };
 
-  const handleRejectSuggestion = async () => {
+  const handleRejectAllPending = async () => {
     if (!aiSuggestion?._id) return;
 
     setIsActionLoading(true);
     try {
-      await rejectSuggestion({ suggestionId: aiSuggestion._id });
+      await rejectPendingChangeGroups({ suggestionId: aiSuggestion._id });
     } catch (error) {
-      console.error("Failed to reject suggestion:", error);
-      alert(error instanceof Error ? error.message : "Failed to reject suggestion");
+      console.error("Failed to reject pending changes:", error);
+      alert(error instanceof Error ? error.message : "Failed to reject pending changes");
     } finally {
       setIsActionLoading(false);
+    }
+  };
+
+  const handleAcceptIndividualChange = async (index: number) => {
+    if (!aiSuggestion?._id) return;
+
+    try {
+      await acceptChangeGroup({
+        suggestionId: aiSuggestion._id,
+        changeGroupIndex: index
+      });
+    } catch (error) {
+      console.error("Failed to accept change:", error);
+      alert(error instanceof Error ? error.message : "Failed to accept change");
+    }
+  };
+
+  const handleRejectIndividualChange = async (index: number) => {
+    if (!aiSuggestion?._id) return;
+
+    try {
+      await rejectChangeGroup({
+        suggestionId: aiSuggestion._id,
+        changeGroupIndex: index
+      });
+    } catch (error) {
+      console.error("Failed to reject change:", error);
+      alert(error instanceof Error ? error.message : "Failed to reject change");
     }
   };
 
@@ -305,10 +335,13 @@ export default function DocumentEditor({ documentId }: DocumentEditorProps) {
       {/* Inline AI Suggestions */}
       {aiSuggestion && !editMode && (
         <InlineSuggestions
+          suggestionId={aiSuggestion._id}
           originalContent={document.currentContent || ""}
           changeGroups={aiSuggestion.changeGroups}
-          onAccept={handleAcceptSuggestion}
-          onReject={handleRejectSuggestion}
+          onAcceptAll={handleAcceptAllPending}
+          onRejectAll={handleRejectAllPending}
+          onAcceptChange={handleAcceptIndividualChange}
+          onRejectChange={handleRejectIndividualChange}
           isLoading={isActionLoading}
         />
       )}

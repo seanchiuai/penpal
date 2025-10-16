@@ -33,12 +33,18 @@ export const create = mutation({
       throw new Error("Unauthorized access to document");
     }
 
+    // Initialize all changeGroups with status: "pending"
+    const changeGroupsWithStatus = args.changeGroups.map(group => ({
+      ...group,
+      status: "pending" as const
+    }));
+
     // Create the suggestion
     return await ctx.db.insert("aiSuggestions", {
       documentId: args.documentId,
       userId: args.userId,
       status: "pending",
-      changeGroups: args.changeGroups,
+      changeGroups: changeGroupsWithStatus,
       createdAt: Date.now(),
     });
   },
@@ -59,11 +65,17 @@ export const createInternal = internalMutation({
     })),
   },
   handler: async (ctx, args) => {
+    // Initialize all changeGroups with status: "pending"
+    const changeGroupsWithStatus = args.changeGroups.map(group => ({
+      ...group,
+      status: "pending" as const
+    }));
+
     return await ctx.db.insert("aiSuggestions", {
       documentId: args.documentId,
       userId: args.userId,
       status: "pending",
-      changeGroups: args.changeGroups,
+      changeGroups: changeGroupsWithStatus,
       createdAt: Date.now(),
     });
   },
@@ -228,6 +240,218 @@ export const clearPending = mutation({
     for (const suggestion of suggestions) {
       await ctx.db.patch(suggestion._id, { status: "rejected" });
     }
+
+    return { success: true };
+  },
+});
+
+/**
+ * Accept an individual change group by index
+ */
+export const acceptChangeGroup = mutation({
+  args: {
+    suggestionId: v.id("aiSuggestions"),
+    changeGroupIndex: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+
+    const suggestion = await ctx.db.get(args.suggestionId);
+    if (!suggestion) {
+      throw new Error("Suggestion not found");
+    }
+
+    // Verify user owns the document
+    const document = await ctx.db.get(suggestion.documentId);
+    if (!document) {
+      throw new Error("Document not found");
+    }
+
+    if (document.userId !== identity.subject) {
+      throw new Error("Unauthorized access to document");
+    }
+
+    // Update the specific change group status
+    const updatedChangeGroups = suggestion.changeGroups.map((group, index) => {
+      if (index === args.changeGroupIndex) {
+        return { ...group, status: "accepted" as const };
+      }
+      return group;
+    });
+
+    await ctx.db.patch(args.suggestionId, {
+      changeGroups: updatedChangeGroups,
+    });
+
+    return { success: true };
+  },
+});
+
+/**
+ * Reject an individual change group by index
+ */
+export const rejectChangeGroup = mutation({
+  args: {
+    suggestionId: v.id("aiSuggestions"),
+    changeGroupIndex: v.number(),
+  },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+
+    const suggestion = await ctx.db.get(args.suggestionId);
+    if (!suggestion) {
+      throw new Error("Suggestion not found");
+    }
+
+    // Verify user owns the document
+    const document = await ctx.db.get(suggestion.documentId);
+    if (!document) {
+      throw new Error("Document not found");
+    }
+
+    if (document.userId !== identity.subject) {
+      throw new Error("Unauthorized access to document");
+    }
+
+    // Update the specific change group status
+    const updatedChangeGroups = suggestion.changeGroups.map((group, index) => {
+      if (index === args.changeGroupIndex) {
+        return { ...group, status: "rejected" as const };
+      }
+      return group;
+    });
+
+    await ctx.db.patch(args.suggestionId, {
+      changeGroups: updatedChangeGroups,
+    });
+
+    return { success: true };
+  },
+});
+
+/**
+ * Accept all pending change groups (not already accepted/rejected individually)
+ * Then apply them to the document
+ */
+export const acceptPendingChangeGroups = mutation({
+  args: { suggestionId: v.id("aiSuggestions") },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+
+    const suggestion = await ctx.db.get(args.suggestionId);
+    if (!suggestion) {
+      throw new Error("Suggestion not found");
+    }
+
+    // Verify user owns the document
+    const document = await ctx.db.get(suggestion.documentId);
+    if (!document) {
+      throw new Error("Document not found");
+    }
+
+    if (document.userId !== identity.subject) {
+      throw new Error("Unauthorized access to document");
+    }
+
+    // Mark all pending change groups as accepted
+    const updatedChangeGroups = suggestion.changeGroups.map((group) => {
+      const status = group.status || "pending";
+      if (status === "pending") {
+        return { ...group, status: "accepted" as const };
+      }
+      return group;
+    });
+
+    await ctx.db.patch(args.suggestionId, {
+      changeGroups: updatedChangeGroups,
+      status: "accepted",
+    });
+
+    // Apply all accepted changes to the document
+    let content = document.content || "";
+
+    // Get only accepted change groups
+    const acceptedGroups = updatedChangeGroups.filter(
+      (group) => (group.status || "pending") === "accepted"
+    );
+
+    // Sort by position (descending) to apply from end to start
+    const sortedGroups = [...acceptedGroups].sort((a, b) => b.startPos - a.startPos);
+
+    for (const group of sortedGroups) {
+      // Remove deletions
+      for (const deletion of group.deletions.sort((a, b) => b.position - a.position)) {
+        const before = content.substring(0, deletion.position);
+        const after = content.substring(deletion.position + deletion.text.length);
+        content = before + after;
+      }
+
+      // Add insertions
+      for (const insertion of group.insertions.sort((a, b) => b.position - a.position)) {
+        const before = content.substring(0, insertion.position);
+        const after = content.substring(insertion.position);
+        content = before + insertion.text + after;
+      }
+    }
+
+    // Update document content
+    await ctx.db.patch(suggestion.documentId, {
+      content,
+      updatedAt: Date.now(),
+    });
+
+    return { success: true };
+  },
+});
+
+/**
+ * Reject all pending change groups (not already accepted/rejected individually)
+ */
+export const rejectPendingChangeGroups = mutation({
+  args: { suggestionId: v.id("aiSuggestions") },
+  handler: async (ctx, args) => {
+    const identity = await ctx.auth.getUserIdentity();
+    if (!identity) {
+      throw new Error("Not authenticated");
+    }
+
+    const suggestion = await ctx.db.get(args.suggestionId);
+    if (!suggestion) {
+      throw new Error("Suggestion not found");
+    }
+
+    // Verify user owns the document
+    const document = await ctx.db.get(suggestion.documentId);
+    if (!document) {
+      throw new Error("Document not found");
+    }
+
+    if (document.userId !== identity.subject) {
+      throw new Error("Unauthorized access to document");
+    }
+
+    // Mark all pending change groups as rejected
+    const updatedChangeGroups = suggestion.changeGroups.map((group) => {
+      const status = group.status || "pending";
+      if (status === "pending") {
+        return { ...group, status: "rejected" as const };
+      }
+      return group;
+    });
+
+    await ctx.db.patch(args.suggestionId, {
+      changeGroups: updatedChangeGroups,
+      status: "rejected",
+    });
 
     return { success: true };
   },

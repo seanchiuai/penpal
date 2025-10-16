@@ -1,21 +1,27 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
+import { Id } from "../convex/_generated/dataModel";
+import { HoverableChange } from "./HoverableChange";
 
 type ChangeGroup = {
   startPos: number;
   endPos: number;
   deletions: Array<{ text: string; position: number }>;
   insertions: Array<{ text: string; position: number }>;
+  status?: "pending" | "accepted" | "rejected";
 };
 
 type ChangeGroupStatus = "pending" | "accepted" | "rejected";
 
 interface InlineSuggestionsProps {
+  suggestionId: Id<"aiSuggestions">;
   originalContent: string;
   changeGroups: ChangeGroup[];
-  onAccept?: () => void;
-  onReject?: () => void;
+  onAcceptAll?: () => void;
+  onRejectAll?: () => void;
+  onAcceptChange?: (index: number) => void;
+  onRejectChange?: (index: number) => void;
   isLoading?: boolean;
 }
 
@@ -27,54 +33,54 @@ interface InlineSuggestionsProps {
  * - Non-continuous changes are separated with unchanged text
  */
 export default function InlineSuggestions({
+  suggestionId,
   originalContent,
   changeGroups,
-  onAccept,
-  onReject,
+  onAcceptAll,
+  onRejectAll,
+  onAcceptChange,
+  onRejectChange,
   isLoading = false,
 }: InlineSuggestionsProps) {
-  // Track the status of each change group individually
-  const [changeStatuses, setChangeStatuses] = useState<ChangeGroupStatus[]>(
-    changeGroups.map(() => "pending")
-  );
-  const [hoveredChangeIndex, setHoveredChangeIndex] = useState<number | null>(null);
 
   const handleAcceptChange = (index: number) => {
-    setChangeStatuses((prev) =>
-      prev.map((status, i) => (i === index ? "accepted" : status))
-    );
+    if (onAcceptChange) {
+      onAcceptChange(index);
+    }
   };
 
   const handleRejectChange = (index: number) => {
-    setChangeStatuses((prev) =>
-      prev.map((status, i) => (i === index ? "rejected" : status))
-    );
+    if (onRejectChange) {
+      onRejectChange(index);
+    }
   };
 
   const handleAcceptAll = () => {
-    if (onAccept) {
-      onAccept();
+    if (onAcceptAll) {
+      onAcceptAll();
     }
   };
 
   const handleRejectAll = () => {
-    if (onReject) {
-      onReject();
+    if (onRejectAll) {
+      onRejectAll();
     }
   };
 
-  const remainingChanges = changeStatuses.filter((s) => s === "pending").length;
-  const hasIndividualActions = changeStatuses.some((s) => s !== "pending");
+  // Use the status from the backend (changeGroups now have status from DB)
+  const remainingChanges = changeGroups.filter((g) => (g.status || "pending") === "pending").length;
+  const hasIndividualActions = changeGroups.some((g) => (g.status || "pending") !== "pending");
 
   /**
-   * Render only the AI-suggested changes without the surrounding unchanged content
-   * Shows only:
+   * Render the full content with inline AI-suggested changes
+   * Shows:
+   * - Unchanged text in normal style
    * - Deletions in red with strikethrough
    * - Insertions in green
-   * - Context separators between non-continuous change groups
+   * - Change groups wrapped in hoverable components
    */
   const renderContentWithSuggestions = () => {
-    // If no change groups, show a message
+    // If no change groups, show the original content
     if (!changeGroups || changeGroups.length === 0) {
       console.log("No change groups, showing no changes message");
       return <span className="text-muted-foreground">No AI suggestions</span>;
@@ -82,6 +88,7 @@ export default function InlineSuggestions({
 
     const segments: JSX.Element[] = [];
     let segmentKey = 0;
+    let lastEndPos = 0;
 
     // Sort change groups by startPos to process them in order
     const sortedGroups = [...changeGroups].sort((a, b) => a.startPos - b.startPos);
@@ -89,25 +96,30 @@ export default function InlineSuggestions({
     console.log("=== InlineSuggestions Render Debug ===");
     console.log("Number of change groups:", sortedGroups.length);
     console.log("Change groups:", JSON.stringify(sortedGroups, null, 2));
+    console.log("Original content length:", originalContent.length);
 
     for (let groupIndex = 0; groupIndex < sortedGroups.length; groupIndex++) {
       const group = sortedGroups[groupIndex];
-      const status = changeStatuses[groupIndex];
-      const isHovered = hoveredChangeIndex === groupIndex;
+      const status = group.status || "pending";
 
       console.log(`\n[Group ${groupIndex}] Processing position ${group.startPos}-${group.endPos}`);
       console.log(`[Group ${groupIndex}] Deletions: ${group.deletions.length}, Insertions: ${group.insertions.length}`);
 
-      // Add a separator between non-continuous change groups
-      if (groupIndex > 0) {
+      // Add unchanged text before this change group
+      if (group.startPos > lastEndPos) {
+        const unchangedText = originalContent.substring(lastEndPos, group.startPos);
+        console.log(`Adding unchanged text from ${lastEndPos} to ${group.startPos}: "${unchangedText}"`);
         segments.push(
-          <span key={`separator-${segmentKey++}`} className="text-muted-foreground mx-2">
-            •••
+          <span key={`unchanged-${segmentKey++}`} className="text-foreground">
+            {unchangedText}
           </span>
         );
       }
 
-      // Wrap the entire change group in a container for hover interaction
+      // Update lastEndPos for the next iteration
+      lastEndPos = group.endPos;
+
+      // Build the change group elements (deletions + insertions)
       const changeGroupElements: JSX.Element[] = [];
 
       // Show deletions (red strikethrough) - the original text being removed
@@ -142,67 +154,34 @@ export default function InlineSuggestions({
         }
       }
 
-      // Wrap change group with hover interaction container
+      // Wrap change group with HoverableChange component
       segments.push(
-        <span
+        <HoverableChange
           key={`change-group-${groupIndex}`}
-          className={`relative inline-block group/change ${
-            status === "accepted" ? "opacity-50" : status === "rejected" ? "opacity-30 line-through" : ""
-          }`}
-          onMouseEnter={() => status === "pending" && setHoveredChangeIndex(groupIndex)}
-          onMouseLeave={() => setHoveredChangeIndex(null)}
+          groupIndex={groupIndex}
+          status={status}
+          onAccept={() => handleAcceptChange(groupIndex)}
+          onReject={() => handleRejectChange(groupIndex)}
         >
           {changeGroupElements}
-          {/* Hover action buttons */}
-          {isHovered && status === "pending" && (
-            <span className="absolute -top-8 left-0 flex items-center gap-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg px-2 py-1 z-10">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleAcceptChange(groupIndex);
-                }}
-                className="p-1 hover:bg-green-100 dark:hover:bg-green-900/30 rounded transition-colors"
-                title="Accept this change"
-              >
-                <svg className="w-4 h-4 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleRejectChange(groupIndex);
-                }}
-                className="p-1 hover:bg-red-100 dark:hover:bg-red-900/30 rounded transition-colors"
-                title="Reject this change"
-              >
-                <svg className="w-4 h-4 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </span>
-          )}
-          {/* Status indicator for accepted/rejected changes */}
-          {status === "accepted" && (
-            <span className="ml-1 inline-flex items-center text-green-600 dark:text-green-400">
-              <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-              </svg>
-            </span>
-          )}
-          {status === "rejected" && (
-            <span className="ml-1 inline-flex items-center text-red-600 dark:text-red-400">
-              <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-              </svg>
-            </span>
-          )}
+        </HoverableChange>
+      );
+    }
+
+    // Add any remaining unchanged text after the last change group
+    if (lastEndPos < originalContent.length) {
+      const remainingText = originalContent.substring(lastEndPos);
+      console.log(`Adding remaining unchanged text from ${lastEndPos} to end: "${remainingText}"`);
+      segments.push(
+        <span key={`unchanged-${segmentKey++}`} className="text-foreground">
+          {remainingText}
         </span>
       );
     }
 
     console.log(`\n=== Render Summary ===`);
     console.log(`Total change groups rendered: ${sortedGroups.length}`);
+    console.log(`Total segments (including unchanged text): ${segments.length}`);
 
     return segments;
   };
@@ -235,7 +214,7 @@ export default function InlineSuggestions({
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {onReject && remainingChanges > 0 && (
+          {onRejectAll && remainingChanges > 0 && (
             <button
               onClick={handleRejectAll}
               disabled={isLoading}
@@ -244,7 +223,7 @@ export default function InlineSuggestions({
               {hasIndividualActions ? "Reject Remaining" : "Reject All"}
             </button>
           )}
-          {onAccept && remainingChanges > 0 && (
+          {onAcceptAll && remainingChanges > 0 && (
             <button
               onClick={handleAcceptAll}
               disabled={isLoading}
@@ -284,11 +263,11 @@ export default function InlineSuggestions({
       </div>
 
       {/* Content with inline suggestions */}
-      <div className="bg-card border border-border rounded-lg p-6">
-        <div className="prose prose-sm max-w-none">
-          <pre className="whitespace-pre-wrap font-mono text-sm bg-transparent leading-relaxed">
+      <div className="bg-card border border-border rounded-lg p-6 overflow-visible">
+        <div className="prose prose-sm max-w-none overflow-visible">
+          <div className="whitespace-pre-wrap font-mono text-sm bg-transparent leading-relaxed overflow-visible">
             {renderContentWithSuggestions()}
-          </pre>
+          </div>
         </div>
       </div>
 
@@ -306,10 +285,10 @@ export default function InlineSuggestions({
         {hasIndividualActions && (
           <p className="mt-1 flex items-center gap-4">
             <span className="text-green-600 dark:text-green-400">
-              ✓ {changeStatuses.filter(s => s === "accepted").length} accepted
+              ✓ {changeGroups.filter(g => (g.status || "pending") === "accepted").length} accepted
             </span>
             <span className="text-red-600 dark:text-red-400">
-              ✗ {changeStatuses.filter(s => s === "rejected").length} rejected
+              ✗ {changeGroups.filter(g => (g.status || "pending") === "rejected").length} rejected
             </span>
             <span className="text-blue-600 dark:text-blue-400">
               ⏳ {remainingChanges} pending

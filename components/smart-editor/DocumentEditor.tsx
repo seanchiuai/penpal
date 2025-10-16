@@ -5,24 +5,46 @@ import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { Save } from "lucide-react";
 import { toast } from "sonner";
+import InlineSuggestions from "@/components/InlineSuggestions";
+import { Id } from "@/convex/_generated/dataModel";
 
 interface Diff {
   type: number; // -1: deletion, 0: unchanged, 1: insertion
   text: string;
 }
 
+type ChangeGroup = {
+  startPos: number;
+  endPos: number;
+  deletions: Array<{ text: string; position: number }>;
+  insertions: Array<{ text: string; position: number }>;
+  status?: "pending" | "accepted" | "rejected";
+};
+
 interface DocumentEditorProps {
   content: string;
   proposedAIDiff?: string;
   isAIPending: boolean;
+  aiSuggestionId?: Id<"aiSuggestions"> | null;
+  changeGroups?: ChangeGroup[];
   onSave: (content: string) => Promise<void>;
+  onAcceptAll?: () => Promise<void>;
+  onRejectAll?: () => Promise<void>;
+  onAcceptChange?: (index: number) => Promise<void>;
+  onRejectChange?: (index: number) => Promise<void>;
 }
 
 export function DocumentEditor({
   content,
   proposedAIDiff,
   isAIPending,
+  aiSuggestionId,
+  changeGroups,
   onSave,
+  onAcceptAll,
+  onRejectAll,
+  onAcceptChange,
+  onRejectChange,
 }: DocumentEditorProps) {
   const [editedContent, setEditedContent] = useState(content);
   const [isSaving, setIsSaving] = useState(false);
@@ -121,10 +143,23 @@ export function DocumentEditor({
   };
 
   return (
-    <div className="h-full flex flex-col">
-      <div className="flex-1 flex flex-col space-y-4">
-        {/* Show diff view if AI suggestions are pending */}
-        {isAIPending && proposedAIDiff ? (
+    <div className="h-full flex flex-col overflow-visible">
+      <div className="flex-1 flex flex-col space-y-4 overflow-visible">
+        {/* Show InlineSuggestions if AI suggestions are pending with changeGroups */}
+        {isAIPending && aiSuggestionId && changeGroups && changeGroups.length > 0 ? (
+          <div className="flex-1 overflow-visible">
+            <InlineSuggestions
+              suggestionId={aiSuggestionId}
+              originalContent={content}
+              changeGroups={changeGroups}
+              onAcceptAll={onAcceptAll}
+              onRejectAll={onRejectAll}
+              onAcceptChange={onAcceptChange}
+              onRejectChange={onRejectChange}
+            />
+          </div>
+        ) : isAIPending && proposedAIDiff ? (
+          /* Fallback to old diff view if using proposedAIDiff format */
           <div className="flex-1">
             {renderDiffView()}
           </div>

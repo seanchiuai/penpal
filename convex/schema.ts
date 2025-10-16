@@ -97,6 +97,7 @@ export default defineSchema({
         text: v.string(),
         position: v.number(),
       })),
+      status: v.optional(v.union(v.literal("pending"), v.literal("accepted"), v.literal("rejected"))),
     })),
     createdAt: v.number(),
   })

@@ -24,9 +24,15 @@ export default function SmartEditorPage({ params }: PageProps) {
   const documentId = id as Id<"documents">;
 
   const document = useQuery(api.documents.getSmartDocument, { documentId });
+  const aiSuggestion = useQuery(api.aiSuggestions.getLatestPending, { documentId });
   const updateContent = useMutation(api.documents.updateSmartDocumentContent);
+  const updateTitle = useMutation(api.documents.updateSmartDocumentTitle);
   const acceptChanges = useMutation(api.documents.acceptAIChanges);
   const rejectChanges = useMutation(api.documents.rejectAIChanges);
+  const acceptPendingChangeGroups = useMutation(api.aiSuggestions.acceptPendingChangeGroups);
+  const rejectPendingChangeGroups = useMutation(api.aiSuggestions.rejectPendingChangeGroups);
+  const acceptChangeGroup = useMutation(api.aiSuggestions.acceptChangeGroup);
+  const rejectChangeGroup = useMutation(api.aiSuggestions.rejectChangeGroup);
   const sendAIRequest = useAction(api.aiActions.sendAIRequest);
 
   const [isAILoading, setIsAILoading] = useState(false);
@@ -45,6 +51,26 @@ export default function SmartEditorPage({ params }: PageProps) {
       documentId,
       newContent,
     });
+  };
+
+  const handleSaveTitle = async () => {
+    if (editedTitle.trim() && editedTitle !== document?.title) {
+      try {
+        await updateTitle({
+          documentId,
+          newTitle: editedTitle.trim(),
+        });
+        toast.success("Title updated");
+      } catch (error) {
+        console.error("Error updating title:", error);
+        toast.error("Failed to update title");
+        // Revert to original title on error
+        if (document) {
+          setEditedTitle(document.title);
+        }
+      }
+    }
+    setIsTitleEditing(false);
   };
 
   const handleSendPrompt = async (prompt: string) => {
@@ -68,6 +94,56 @@ export default function SmartEditorPage({ params }: PageProps) {
 
   const handleRejectChanges = async () => {
     await rejectChanges({ documentId });
+  };
+
+  const handleAcceptAllPending = async () => {
+    if (!aiSuggestion?._id) return;
+    try {
+      await acceptPendingChangeGroups({ suggestionId: aiSuggestion._id });
+      toast.success("All pending changes accepted");
+    } catch (error) {
+      console.error("Error accepting pending changes:", error);
+      toast.error("Failed to accept pending changes");
+    }
+  };
+
+  const handleRejectAllPending = async () => {
+    if (!aiSuggestion?._id) return;
+    try {
+      await rejectPendingChangeGroups({ suggestionId: aiSuggestion._id });
+      toast.success("All pending changes rejected");
+    } catch (error) {
+      console.error("Error rejecting pending changes:", error);
+      toast.error("Failed to reject pending changes");
+    }
+  };
+
+  const handleAcceptIndividualChange = async (index: number) => {
+    if (!aiSuggestion?._id) return;
+    try {
+      await acceptChangeGroup({
+        suggestionId: aiSuggestion._id,
+        changeGroupIndex: index,
+      });
+      toast.success("Change accepted");
+    } catch (error) {
+      console.error("Error accepting change:", error);
+      toast.error("Failed to accept change");
+    }
+  };
+
+  const handleRejectIndividualChange = async (index: number) => {
+    if (!aiSuggestion?._id) return;
+    try {
+      await rejectChangeGroup({
+        suggestionId: aiSuggestion._id,
+        changeGroupIndex: index,
+      });
+      toast.success("Change rejected");
+    } catch (error) {
+      console.error("Error rejecting change:", error);
+      toast.error("Failed to reject change");
+    }
   };
 
   if (document === undefined) {
@@ -116,11 +192,13 @@ export default function SmartEditorPage({ params }: PageProps) {
             <Input
               value={editedTitle}
               onChange={(e) => setEditedTitle(e.target.value)}
-              onBlur={() => setIsTitleEditing(false)}
+              onBlur={handleSaveTitle}
               onKeyDown={(e) => {
                 if (e.key === "Enter") {
+                  handleSaveTitle();
+                } else if (e.key === "Escape") {
+                  setEditedTitle(document.title);
                   setIsTitleEditing(false);
-                  // TODO: Add mutation to update title
                 }
               }}
               className="text-xl font-semibold max-w-md"
@@ -147,13 +225,19 @@ export default function SmartEditorPage({ params }: PageProps) {
       {/* Two-panel layout */}
       <div className="flex-1 flex overflow-hidden">
         {/* Left panel: Document Editor */}
-        <div className="flex-1 overflow-y-auto">
-          <div className="max-w-4xl mx-auto p-6">
+        <div className="flex-1 overflow-y-auto overflow-x-visible">
+          <div className="max-w-4xl mx-auto p-6 overflow-visible">
             <DocumentEditor
               content={document.content || ""}
               proposedAIDiff={document.proposedAIDiff}
               isAIPending={document.isAIPending}
+              aiSuggestionId={aiSuggestion?._id || null}
+              changeGroups={aiSuggestion?.changeGroups || []}
               onSave={handleSaveContent}
+              onAcceptAll={handleAcceptAllPending}
+              onRejectAll={handleRejectAllPending}
+              onAcceptChange={handleAcceptIndividualChange}
+              onRejectChange={handleRejectIndividualChange}
             />
           </div>
         </div>
