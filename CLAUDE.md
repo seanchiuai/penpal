@@ -43,6 +43,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - `npx convex dev` - Start Convex development server (auto-started with `npm run dev`)
 - `npx convex deploy` - Deploy Convex functions to production
 
+### Run/Execution Policy
+- Only run `npm run dev` for brief, self-contained testing.
+- Do not leave servers running after tests complete; stop them immediately.
+- If a server must be started to verify behavior, terminate it before ending the turn.
+
 ## Architecture
 
 This is a full-stack TypeScript application using:
