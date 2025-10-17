@@ -17,6 +17,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   - If a user requests a feature with a plan, always reference and follow that plan
   - If no matching plan exists, proceed with the implementation normally
   - If the user requests for a new feature, create implementation plans here
+  - If the user's new request is similar to an existing implementation 
+  - Always update and check the 
 - **`/spec`** - Contains the high-level spec sheet (`spec-sheet.md`) that describes the app's purpose, core features, UI design, and overall tech stack
   - Always review `/spec/spec-sheet.md` to understand the project's goals and requirements before starting or suggesting any major changes
   - If a user asks for an app change that does not align with the current spec sheet, **pause and confirm with the user before proceeding**. Once confirmed, update the spec sheet accordingly to ensure project documentation stays accurate and in sync with development

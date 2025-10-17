@@ -17,7 +17,7 @@ export function DocumentList() {
   if (!user) return null;
 
   const handleDocumentClick = (documentId: string) => {
-    router.push(`/smart-editor/${documentId}`);
+    router.push(`/documents/${documentId}`);
   };
 
   const formatDate = (timestamp: number) => {

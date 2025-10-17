@@ -1,135 +1,308 @@
-My research confirms that Convex Actions are indeed the correct primitive for this use case. They allow external API calls (to AI services) and arbitrary server-side logic (like diffing). Environment variables are the secure way to store API keys. Convex supports various authentication methods, with Clerk being a popular choice for Next.js, and a Convex Auth library in beta.
+# Smart Editor Feature - Implementation Report
 
-For the diffing, a standard library like `diff-match-patch` will be used within the Convex Action. The output of this can be stored in the database.
+## Overview
 
-Let's refine the roadmap.
+The Smart Editor is a fully functional AI-powered document editing system that allows users to create documents and request AI-assisted modifications. The system uses OpenAI's GPT models to generate suggested changes, displays them with visual diff highlighting, and allows users to accept or reject the changes.
 
-**Convex Actions with Server-Side Diffing API Understanding:**
+## Files Created/Modified
 
-*   **Core purpose and capabilities:** Convex Actions are server-side functions designed for non-deterministic operations and side effects, such as making external API calls (e.g., to an AI service like OpenAI) and performing complex computations that require more execution time or specific Node.js environments. They can read from and write to the Convex database via internal queries and mutations.
-*   **Key limitations and constraints:** Actions have execution time limits (30s free, 60s paid) and cannot directly stream responses back to the client. Error handling for actions is the caller's responsibility, as side effects prevent automatic retries by Convex.
-*   **How Smart Editor fits:** Convex Actions will facilitate the AI interaction by sending document content and prompts to an AI service, receiving the AI's proposed content, and then performing server-side diffing to highlight changes. These diffs are then stored in Convex for real-time display and user acceptance/rejection.
-*   **Authentication requirements and methods:** Authentication for Convex actions uses standard Convex authentication mechanisms, often involving third-party providers like Clerk or the beta Convex Auth library, which issues JWTs. API keys for external AI services are stored securely as Convex environment variables.
-*   **Rate limits, pricing considerations, and usage restrictions:** Pricing is based on Convex operations, storage, and action execution time. Frequent or long-running AI calls via actions will increase costs. External AI service rate limits must also be considered and handled.
+### Backend (Convex)
 
-**Implementation Details:**
+#### New Files
+1. **convex/aiActions.ts** - Convex Actions for AI integration
+   - `sendAIRequest`: Main action that calls OpenAI API and computes diffs
+   - `sendAdvancedAIRequest`: Alternative action with custom system prompts
+   - Uses `@ai-sdk/openai` and `diff-match-patch` libraries
+   - Includes comprehensive error handling for rate limits and timeouts
 
-*   **Documentation:** Convex's official documentation for Actions and environment variables is crucial. For AI integration, the `@ai-sdk` packages are recommended.
-*   **Next.js Integration:** The Convex client SDK (`useQuery`, `useMutation`) integrates seamlessly with Next.js React components for calling backend functions and subscribing to real-time data.
-*   **Best Practices:** Store sensitive AI API keys in Convex environment variables. Handle potential AI service errors (timeouts, rate limits). Compute diffs on the server for efficiency and to offload client work.
+#### Modified Files
+2. **convex/schema.ts** - Updated database schema
+   - Added Smart Editor fields: `userId`, `title`, `content`, `isAIPending`
+   - Added AI diff fields: `proposedAIContent`, `proposedAIDiff`
+   - Made fields optional for backward compatibility with existing data
+   - Maintains indexes for efficient queries
 
-The "Convex Actions with Server-Side Diffing" is not a specific Convex product, but rather an implementation pattern using Convex Actions to interact with an AI and then compute textual differences on the Convex backend.
+3. **convex/documents.ts** - Document management functions
+   - `createSmartDocument`: Create new documents
+   - `getSmartDocument`: Retrieve document with auth check
+   - `listSmartDocuments`: List user's documents with filtering
+   - `updateSmartDocumentContent`: Update document content
+   - `acceptAIChanges`: Apply AI suggestions to document
+   - `rejectAIChanges`: Discard AI suggestions
+   - `getDocumentInternal`: Internal query for AI actions
+   - `updateWithAISuggestion`: Internal mutation for AI actions
 
-Now, structuring the roadmap.
+4. **convex/changeControlDocuments.ts** - Fixed schema compatibility
 
-# Roadmap: Smart Editor
+### Frontend (Next.js)
 
-## Context
-- Stack: Next.js, convex, @ai-sdk/openai
-- Feature: Smart Editor with Convex Actions with Server-Side Diffing
+#### New Files
+5. **app/smart-editor/page.tsx** - Dashboard page
+   - Lists all user documents
+   - Create new document dialog
+   - Delete document functionality
+   - Shows AI pending status indicator
+   - Responsive grid layout
 
-## Implementation Steps
+6. **app/smart-editor/[id]/page.tsx** - Editor page
+   - Two-panel layout (editor + AI sidebar)
+   - Document loading and error states
+   - Real-time updates via Convex
+   - Title editing functionality
 
-### 1. Manual Setup (User Required)
-- [ ] Create Convex account
-- [ ] Create OpenAI account
-- [ ] Configure Convex project (e.g., via `npx convex init`)
-- [ ] Generate OpenAI API key
-- [ ] Configure billing for Convex (consider action usage)
-- [ ] Configure billing for OpenAI (consider token usage)
+7. **components/smart-editor/DocumentEditor.tsx** - Document editor component
+   - Rich text editing with textarea
+   - Visual diff rendering with color highlighting
+   - Save functionality with optimistic updates
+   - Shows AI suggestions vs current content
 
-### 2. Dependencies & Environment
-- [ ] Install: `convex`, `@ai-sdk/openai`, `diff-match-patch`, `next`, `react`, `react-dom`
-- [ ] Env vars: `OPENAI_API_KEY` (Convex dashboard), `NEXT_PUBLIC_CONVEX_URL` (local `.env.local` for Next.js, configured by `npx convex dev`)
+8. **components/smart-editor/AIChatSidebar.tsx** - AI chat sidebar
+   - Prompt input with keyboard shortcuts
+   - Accept/Reject buttons for AI suggestions
+   - Quick action prompts
+   - Tips and help section
+   - Loading states
 
-### 3. Database Schema
-- [ ] Structure:
-  ```typescript
-  // convex/schema.ts
-  import { defineSchema, defineTable } from "convex/server";
-  import { v } from "convex/values";
+9. **components/ui/dialog.tsx** - Dialog component (shadcn/ui)
+   - Modal dialog for creating documents
+   - Reusable across the app
 
-  export default defineSchema({
-    documents: defineTable({
-      userId: v.id("users"), // Assuming user authentication via a 'users' table
-      title: v.string(),
-      content: v.string(), // The currently accepted document content
-      proposedAIContent: v.optional(v.string()), // AI's suggested full content
-      proposedAIDiff: v.optional(v.array(v.union( // Server-side computed diff (e.g., diff-match-patch format)
-        v.array(v.union(v.literal(-1), v.literal(0), v.literal(1)), v.string())
-      ))),
-      isAIPending: v.boolean(), // Flag to indicate if an AI suggestion is active
-    }).index("byUserId", ["userId"]),
-    users: defineTable({ // Example users table for authentication
-      // ... user fields (e.g., clerkUserId, name)
-    })
-  });
-  ```
+### Dependencies
+- **diff-match-patch**: Server-side text diffing (v1.0.5)
+- **@types/diff-match-patch**: TypeScript types (v1.0.36)
+- **@ai-sdk/openai**: OpenAI integration (already installed)
+- **ai**: Vercel AI SDK (already installed)
 
-### 4. Backend Functions
-- [ ] Functions:
-    - `documents.createDocument` (Mutation): Create a new empty document for a user.
-    - `documents.getDocument` (Query): Fetch a document and its `proposedAIContent`/`proposedAIDiff` by ID.
-    - `documents.sendAIRequest` (Action, `use node` directive):
-        - Input: `documentId`, `originalContent`, `prompt`.
-        - Logic: Call `@ai-sdk/openai` with `originalContent` and `prompt`.
-        - Logic: Compute diff between `originalContent` and AI's `newContent` using `diff-match-patch`.
-        - Logic: Update `documents` table via internal mutation (`ctx.runMutation`) to set `proposedAIContent`, `proposedAIDiff`, and `isAIPending` for the `documentId`.
-    - `documents.acceptAIChanges` (Mutation):
-        - Input: `documentId`.
-        - Logic: Update `documents` table: set `content` to `proposedAIContent`, clear `proposedAIContent`, `proposedAIDiff`, and set `isAIPending` to `false`.
-    - `documents.rejectAIChanges` (Mutation):
-        - Input: `documentId`.
-        - Logic: Update `documents` table: clear `proposedAIContent`, `proposedAIDiff`, and set `isAIPending` to `false`.
-    - `documents.updateDocumentContent` (Mutation):
-        - Input: `documentId`, `newContent`.
-        - Logic: Allow user to manually edit and save the `content` (clears pending AI suggestions if any).
+## Key Features Implemented
 
-### 5. Frontend
-- [ ] Components:
-    - `Dashboard`: Displays a list of user's documents.
-    - `EditorPage`: Main editor view, includes `DocumentEditor` and `AIChatSidebar`.
-    - `DocumentEditor`:
-        - Displays `documents.content`.
-        - Renders `documents.proposedAIDiff` on top of `documents.content` to highlight changes if `documents.isAIPending` is `true`.
-        - Input field for manual edits, triggers `documents.updateDocumentContent`.
-    - `AIChatSidebar`:
-        - Input field for AI prompts.
-        - Triggers `documents.sendAIRequest` action.
-        - Displays AI response status (e.g., "AI is thinking...").
-        - Buttons to `Accept All` or `Reject All` proposed changes, triggering `documents.acceptAIChanges` or `documents.rejectAIChanges`.
-        - Future enhancement: Individual accept/reject for diff chunks.
-- [ ] State:
-    - Document content and pending AI diffs fetched via `useQuery` from Convex.
-    - Local UI state for AI chat input, loading indicators.
-    - Use `immer` or similar for efficient local state updates if complex diff interactions are needed client-side, otherwise, Convex's reactivity handles most updates.
+### 1. Document Management
+- Create documents with titles
+- List all user documents
+- Delete documents
+- Auto-save on content changes
+- Real-time synchronization
 
-### 6. Error Prevention
-- [ ] API errors: Implement `try...catch` blocks in Convex Actions for AI API calls. Handle network issues, rate limits, and malformed responses from the AI service.
-- [ ] Validation: Validate `prompt` input length on frontend and backend. Validate `documentId` and `content` inputs in mutations/actions.
-- [ ] Rate limiting: Implement client-side debounce for AI prompts. Consider server-side rate limiting within Convex Actions for AI requests if needed (e.g., using a separate table to track user requests).
-- [ ] Auth: Use Convex's `ctx.auth` to ensure users can only access/modify their own documents.
-- [ ] Type safety: Leverage Convex's end-to-end type safety for all queries, mutations, and actions using `npx convex codegen`.
-- [ ] Boundaries: Set reasonable timeouts for AI API calls within Convex Actions.
+### 2. AI Integration
+- Send natural language prompts to AI
+- AI analyzes document and generates suggestions
+- Server-side diffing with diff-match-patch
+- Stores diff results in database for persistence
 
-### 7. Testing
-- [ ] Test scenarios:
-    - User creates a new document.
-    - User sends an AI prompt, AI proposes changes, changes are highlighted.
-    - User accepts all AI changes.
-    - User rejects all AI changes.
-    - User makes manual edits, then sends an AI prompt.
-    - Edge cases: Empty document, very long document, AI returns no changes.
-    - Authentication: Unauthorized user tries to edit another user's document.
-    - Error handling: AI service returns an error or times out.
-    - Concurrent AI requests (if applicable for future scaling).
-    - Frontend rendering of diffs (insertions, deletions, modifications).
+### 3. Diff Visualization
+- Red highlighting for deletions (with strikethrough)
+- Green highlighting for insertions
+- Gray text for unchanged content
+- Scrollable diff view
+- Split view: AI suggestions above, current content below
 
-## Documentation Sources
+### 4. Accept/Reject Workflow
+- Review AI suggestions before applying
+- Accept button: applies all changes to document
+- Reject button: discards suggestions
+- Visual indicator when AI suggestions are pending
 
-This implementation plan was created using the following documentation sources:
+### 5. Security & Authentication
+- All queries/mutations check user authentication
+- Users can only access their own documents
+- Server-side validation for all operations
+- Row-level security via userId filtering
 
-1. [youtube.com](https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQFrU5Hw7CWYtpd6CIOzQ7IPJImlsUuV8duDuHKUhZW-1cUt_rKUvs0X2HcRR553cqQw4UgJR4FYX-r-gvRXXcnSNdxeofjtBgj6NOkDv33CCvPZRrVEVHS2wpvQI51vlBIQR0JVlg==)
-2. [Current time information in San Francisco, CA, US.](https://www.google.com/search?q=time+in+San+Francisco,+CA,+US)
-3. [convex.dev](https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQGj6j-l9Kh-UY-Zr5jcpIGw31xhFUdnzJQpnmgSUVSHudlISFiim6a-jtn4K_C1XsMhHHQy1nJhOyxT1mecrOBOeKgcTPHbCncsZ-mn33dtD5ct2X9QvT30XjbCs-YhGogHQxU=)
-4. [githubusercontent.com](https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQGvj46jpSHpZK9bM0Hcnb7PjsDQ_DYwf4p6X5cSN2rzu1aPoXhyiZJfqotWojmshmalRK4XMPZuoLfwZagxLUnq6Uq5E_Z35Bh7Zg-2whvpAbUT-VOgUqzti69TdUIfW148c0BlGMnSkAFdappiOv9H6QQMXKbBDvrZ-EsjhTQO4V6C0OeqOaM8iJCT1Mk9YnB-6-Fji4GJBRt4dA2xk-AZgUZ2j-a8aeBeQNtZnRWtkTTRfg==)
+### 6. Error Handling
+- Try-catch blocks in all async operations
+- User-friendly error messages via toast notifications
+- Graceful handling of rate limits and timeouts
+- Loading states throughout the UI
+
+## Architecture Decisions
+
+### Backend Pattern: Convex Actions with Server-Side Diffing
+
+**Why Convex Actions?**
+- Actions allow external API calls (to OpenAI)
+- Can use Node.js libraries like diff-match-patch
+- Proper execution time limits (30s free, 60s paid)
+
+**Why Server-Side Diffing?**
+- Offloads computation from client
+- Consistent diff algorithm across all clients
+- Can store/cache diff results in database
+- Reduces client bundle size
+
+### Data Flow
+1. User types prompt in AI sidebar
+2. Frontend calls `sendAIRequest` action
+3. Action fetches document, calls OpenAI API
+4. OpenAI returns suggested content
+5. Server computes diff using diff-match-patch
+6. Server stores diff + proposed content in database
+7. Frontend reactively updates via Convex subscription
+8. User reviews diff and accepts/rejects
+
+### UI Pattern: Two-Panel Layout
+- Left panel: Document editor
+- Right panel: AI chat sidebar
+- Mirrors familiar IDE/editor patterns
+- Maximizes screen real estate
+- Clear separation of concerns
+
+## Testing Instructions
+
+### 1. Start Development Server
+```bash
+npm run dev
+```
+This starts both Next.js frontend and Convex backend.
+
+### 2. Access Smart Editor
+Navigate to: `http://localhost:3000/smart-editor`
+
+### 3. Create a Document
+1. Click "New Document" button
+2. Enter a title
+3. Click "Create Document"
+
+### 4. Add Content
+1. Type some content in the editor
+2. Click "Save" to persist changes
+
+### 5. Test AI Suggestions
+1. In the AI sidebar, enter a prompt like:
+   - "Make this more concise"
+   - "Fix grammar and spelling errors"
+   - "Add more detail to the introduction"
+2. Click "Generate Suggestions" or press Cmd/Ctrl+Enter
+3. Wait for AI to process (loading indicator appears)
+4. Review the highlighted diff in the editor
+
+### 6. Accept/Reject Changes
+1. Once AI suggestions appear, two buttons show:
+   - "Accept All Changes" - applies suggestions to document
+   - "Reject All Changes" - discards suggestions
+2. Test both workflows
+
+### 7. Test Quick Actions
+Click any of the quick action buttons in the sidebar to auto-fill prompts
+
+### 8. Test Error Handling
+- Try empty prompts (should show error)
+- Try without internet (should handle gracefully)
+- Try accessing another user's document (should deny)
+
+## Environment Variables
+
+### Required (Already Configured)
+- `OPENAI_API_KEY` - Set in Convex dashboard environment variables
+- `NEXT_PUBLIC_CONVEX_URL` - Auto-configured by Convex CLI
+- `CLERK_JWT_ISSUER_DOMAIN` - Set in Convex dashboard (for auth)
+
+### Frontend (.env.local)
+```env
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_*****
+NEXT_PUBLIC_CONVEX_URL=https://your-deployment.convex.cloud
+```
+
+## Known Limitations & Future Enhancements
+
+### Current Limitations
+1. **No streaming responses** - Users must wait for complete AI response
+2. **Limited to text content** - No rich formatting support yet
+3. **Single AI model** - Uses gpt-4o-mini for all requests
+
+### ✅ Recently Implemented (October 2025)
+- **Granular change control** - Hover over individual changes to accept/reject them using Radix UI Popover
+- **Full content display** - See complete document with inline highlighted changes, not just change snippets
+- See `/HOVER_ACCEPT_REJECT_IMPLEMENTATION.md` for complete details
+
+### Suggested Enhancements
+1. **Streaming AI responses** - Show progress as AI generates content
+2. **Rich text editor** - Support for formatting, links, images
+3. **Model selection** - Let users choose AI model (GPT-4, Claude, etc.)
+4. **Version history** - Track document revisions over time
+5. **Export/Import** - Download as PDF, Markdown, DOCX
+6. **AI chat history** - Store conversation with AI for context
+7. **Batch operations** - Process multiple documents at once
+8. **Keyboard shortcuts** - Press 'a' to accept, 'r' to reject focused changes
+9. **Mobile touch support** - Tap-based accept/reject for touch devices
+
+## Performance Considerations
+
+### Database Queries
+- Indexed queries on `userId` for fast document retrieval
+- Filtered queries to show only Smart Editor documents
+- Real-time subscriptions with Convex
+
+### AI API Calls
+- Rate limiting handled via error messages
+- Timeout protection (inherent in Convex Actions)
+- Cost optimization: Using gpt-4o-mini by default
+
+### Bundle Size
+- Server-side diffing keeps client bundle small
+- Lazy loading of editor components
+- Minimal dependencies in frontend
+
+## Troubleshooting
+
+### Issue: "Not authenticated" error
+**Solution**: Ensure Clerk is properly configured and user is logged in
+
+### Issue: AI request fails
+**Solutions**:
+- Check OPENAI_API_KEY is set in Convex dashboard
+- Verify OpenAI account has credits
+- Check internet connectivity
+- Review Convex logs for detailed error
+
+### Issue: Documents not showing
+**Solutions**:
+- Check browser console for errors
+- Verify Convex is running (`npx convex dev`)
+- Ensure user is authenticated
+- Check database has documents with userId field
+
+### Issue: Diff not displaying correctly
+**Solutions**:
+- Check proposedAIDiff is valid JSON in database
+- Verify diff-match-patch is installed
+- Check browser console for parsing errors
+
+## Code Quality & Best Practices
+
+### Type Safety
+- Full TypeScript support throughout
+- Convex provides end-to-end type generation
+- No `any` types used
+
+### Error Handling
+- Try-catch blocks in all async operations
+- User-friendly error messages
+- Console logging for debugging
+
+### Security
+- Authentication checks in all mutations/queries
+- User isolation via userId filtering
+- No sensitive data in client code
+
+### Code Organization
+- Modular components (following CLAUDE.md guidelines)
+- Separation of concerns (UI vs logic)
+- Reusable components in `/components/ui`
+
+### UI/UX
+- Loading states for all async operations
+- Toast notifications for user feedback
+- Keyboard shortcuts (Cmd/Ctrl+Enter)
+- Responsive design
+- Matches existing design system
+
+## Next Steps
+
+1. **User Testing**: Gather feedback on UI/UX
+2. **Performance Monitoring**: Track AI response times
+3. **Cost Analysis**: Monitor OpenAI API usage
+4. **Feature Expansion**: Implement suggested enhancements
+5. **Documentation**: Create user guide and API docs
+
+## Conclusion
+
+The Smart Editor feature is fully implemented and ready for testing. All components follow the implementation plan, use best practices, and integrate seamlessly with the existing Next.js + Convex + Clerk stack. The two-panel UI provides an intuitive editing experience, and the server-side diffing ensures consistent, performant AI suggestions.

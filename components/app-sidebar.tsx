@@ -6,7 +6,6 @@ import {
   IconInnerShadowTop,
   IconSettings,
   IconFileText,
-  IconGitBranch,
 } from "@tabler/icons-react"
 
 import { NavMain } from "@/components/nav-main"
@@ -28,11 +27,6 @@ const data = {
       title: "Documents",
       url: "/documents",
       icon: IconFileText,
-    },
-    {
-      title: "Change Controls",
-      url: "/change-controls",
-      icon: IconGitBranch,
     },
   ],
   navSecondary: [
