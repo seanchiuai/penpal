@@ -12,6 +12,7 @@ import type * as aiActions from "../aiActions.js";
 import type * as aiSuggestions from "../aiSuggestions.js";
 import type * as changeControlChanges from "../changeControlChanges.js";
 import type * as changeControlDocuments from "../changeControlDocuments.js";
+import type * as chatMessages from "../chatMessages.js";
 import type * as documents from "../documents.js";
 import type * as suggestionActions from "../suggestionActions.js";
 import type * as suggestionMutations from "../suggestionMutations.js";
@@ -37,6 +38,7 @@ declare const fullApi: ApiFromModules<{
   aiSuggestions: typeof aiSuggestions;
   changeControlChanges: typeof changeControlChanges;
   changeControlDocuments: typeof changeControlDocuments;
+  chatMessages: typeof chatMessages;
   documents: typeof documents;
   suggestionActions: typeof suggestionActions;
   suggestionMutations: typeof suggestionMutations;

@@ -103,4 +103,14 @@ export default defineSchema({
   })
     .index("by_document", ["documentId"])
     .index("by_document_status", ["documentId", "status"]),
+  chatMessages: defineTable({
+    documentId: v.id("documents"),
+    userId: v.string(),
+    role: v.union(v.literal("user"), v.literal("assistant")),
+    content: v.string(),
+    suggestionId: v.optional(v.id("aiSuggestions")),
+    createdAt: v.number(),
+  })
+    .index("by_document", ["documentId"])
+    .index("by_document_created", ["documentId", "createdAt"]),
 });

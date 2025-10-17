@@ -245,6 +245,7 @@ export default function DocumentPage({ params }: PageProps) {
         {/* Right panel: AI Chat Sidebar */}
         <div className="w-[400px] flex-shrink-0">
           <AIChatSidebar
+            documentId={documentId}
             isAIPending={document.isAIPending}
             isLoading={isAILoading}
             onSendPrompt={handleSendPrompt}

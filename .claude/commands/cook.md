@@ -6,7 +6,7 @@ argument-hint: []
 
 # Command: /cook
 
-Please execute all the plans located in the `/plans` folder.
+Please execute one specific (to be specified) feature located in the `/plans` folder. 
 
 For each plan:
 1. Identify the corresponding agent from the `/agents` folder required to execute the plan.

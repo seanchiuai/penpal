@@ -7,6 +7,7 @@ This directory contains implementation plans and documentation for features in t
 - [AI Suggestion Review](#ai-suggestion-review)
 - [Smart Editor](#smart-editor)
 - [Hover Accept/Reject Individual Changes](#hover-acceptreject-individual-changes)
+- [Chat-Like AI Sidebar](#chat-like-ai-sidebar)
 
 ---
 
@@ -141,6 +142,67 @@ Granular hover-based accept/reject functionality for individual AI-suggested cha
 - Debounced close for smooth UX (GitHub PR hover pattern)
 - Full content display for better context
 - `<div>` with `whitespace-pre-wrap` instead of `<pre>` for better layout control
+
+---
+
+## Chat-Like AI Sidebar
+
+**File:** `FEATURE_CHAT_SIDEBAR_IMPLEMENTATION.md`
+
+**Status:** ✅ Implemented
+
+**Summary:**
+Transform the current AI sidebar into a conversational chat interface that records and displays the full conversation history between the user and AI assistant. Instead of a single-input form interface, the sidebar will show a scrollable chat history with message bubbles, avatars, and timestamps, creating a more engaging and intuitive collaboration experience.
+
+**Key Features:**
+- Scrollable chat history showing all user requests and AI responses
+- Message bubbles with avatars (user icon, AI sparkle icon)
+- Timestamps for each message
+- Persistent conversation history stored in database
+- Fixed input area at bottom with send button
+- Auto-scroll to latest message
+- Typing indicator while AI is processing
+- Quick action chips for common prompts
+- Accept/Reject buttons integrated into chat flow
+
+**Technology Stack:**
+- UI Components: shadcn/ui (Avatar, ScrollArea, Button, Textarea)
+- Icons: Lucide React (User, Sparkles, Send, Loader2)
+- Database: Convex `chatMessages` table with real-time subscriptions
+- Styling: Tailwind CSS for message bubbles and chat layout
+- Backend: Convex mutations and queries for message CRUD
+
+**Key Files:**
+- `/components/smart-editor/ChatMessage.tsx` - Individual message bubble component (NEW)
+- `/components/smart-editor/AIChatSidebar.tsx` - Refactored chat interface (UPDATED)
+- `/convex/chatMessages.ts` - Chat message CRUD operations (NEW)
+- `/convex/aiActions.ts` - Updated to create chat messages (UPDATED)
+- `/convex/schema.ts` - Add chatMessages table (UPDATED)
+- `/app/documents/[id]/page.tsx` - Pass documentId prop (UPDATED)
+
+**Database Schema:**
+- New `chatMessages` table with fields:
+  - `documentId` - Link to document
+  - `userId` - Message author
+  - `role` - "user" or "assistant"
+  - `content` - Message text
+  - `suggestionId` - Optional link to AI suggestion
+  - `createdAt` - Timestamp
+
+**User Experience Improvements:**
+- **Before**: Single input field, no history, unclear what AI did
+- **After**: Full conversation context, can review past requests, AI explains changes, feels like collaboration
+
+**Use Cases:**
+- Review conversation history to understand document evolution
+- Reference previous AI suggestions and explanations
+- Better understanding of what changes AI made and why
+- More engaging and intuitive AI collaboration
+
+**Implementation Phases:**
+1. **Phase 1**: Database & backend (schema, mutations, queries)
+2. **Phase 2**: UI components (ChatMessage, refactored sidebar)
+3. **Phase 3**: Integration & polish (auto-scroll, animations, testing)
 
 ---
 

@@ -14,17 +14,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   - Before implementing features, check if a relevant plan exists in this directory
   - Follow the step-by-step instructions in the plan when implementing the feature
   - Plans provide architecture decisions, file locations, and implementation details
-  - If a user requests a feature with a plan, always reference and follow that plan
-  - If no matching plan exists, proceed with the implementation normally
-  - If the user requests for a new feature, create implementation plans here
-  - If the user's new request is similar to an existing implementation 
-  - Always update and check the 
+  - If a user requests new features relevant to an existing plan, modify that plan based on the user's request
+  - If no matching plan exists, create a new implementation plan
+  - Always update and check `PLANS_DIRECTORY.md` before implementing a new feature
+  - Plans should be named `FEATURE_[FEATURE DESCRIPTION]_IMPLEMENTATION.md`
 - **`/spec`** - Contains the high-level spec sheet (`spec-sheet.md`) that describes the app's purpose, core features, UI design, and overall tech stack
-  - Always review `/spec/spec-sheet.md` to understand the project's goals and requirements before starting or suggesting any major changes
+  - Review `/spec/spec-sheet.md` to understand the project's goals and requirements before starting or suggesting any major changes
   - If a user asks for an app change that does not align with the current spec sheet, **pause and confirm with the user before proceeding**. Once confirmed, update the spec sheet accordingly to ensure project documentation stays accurate and in sync with development
-  - The spec sheet is the canonical source for the intended behavior and architecture of the app, not just the tech stack
+  - The spec sheet is the canonical source for the intended behavior and architecture of the app
 
-**IMPORTANT**: Always check these directories when starting a new feature or task. Custom agents, plans, and the spec sheet provide project-specific expertise and tested approaches when available.
+**IMPORTANT**: Always check these directories when starting a new feature or task. Always use the Context7 MCP to do more research for complicated features before creating and editing a plan. Custom agents, plans, and the spec sheet provide project-specific expertise and tested approaches when available.
 
 ## Commands
 

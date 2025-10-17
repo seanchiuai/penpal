@@ -119,6 +119,13 @@ export const sendAIRequest = action({
     }
 
     try {
+      // 1. Create user message first to record the prompt
+      await ctx.runMutation(internal.chatMessages.createUserMessageInternal, {
+        documentId: args.documentId,
+        userId: identity.subject,
+        content: args.prompt,
+      });
+
       // Get the current document content
       const document: any = await ctx.runQuery(internal.documents.getDocumentInternal, {
         documentId: args.documentId,
@@ -185,9 +192,19 @@ Please provide the complete modified version of the document. Return ONLY the mo
         diffResult,
       });
 
+      // 2. Create AI response message with summary
+      const summaryMessage = `I've analyzed your document and generated ${changeGroups.length} suggested ${changeGroups.length === 1 ? 'change' : 'changes'}. Review them in the editor and accept or reject as needed.`;
+
+      await ctx.runMutation(internal.chatMessages.createAIMessageInternal, {
+        documentId: args.documentId,
+        userId: identity.subject,
+        content: summaryMessage,
+        suggestionId,
+      });
+
       return {
         success: true,
-        message: "AI suggestions generated successfully",
+        message: summaryMessage,
         suggestionId,
         changeGroupCount: changeGroups.length,
       };
@@ -232,6 +249,13 @@ export const sendAdvancedAIRequest = action({
     }
 
     try {
+      // 1. Create user message first to record the prompt
+      await ctx.runMutation(internal.chatMessages.createUserMessageInternal, {
+        documentId: args.documentId,
+        userId: identity.subject,
+        content: args.prompt,
+      });
+
       const document: any = await ctx.runQuery(internal.documents.getDocumentInternal, {
         documentId: args.documentId,
       });
@@ -299,9 +323,19 @@ Provide the complete revised document. Return ONLY the document content without 
         diffResult,
       });
 
+      // 2. Create AI response message with summary
+      const summaryMessage = `I've analyzed your document and generated ${changeGroups.length} suggested ${changeGroups.length === 1 ? 'change' : 'changes'}. Review them in the editor and accept or reject as needed.`;
+
+      await ctx.runMutation(internal.chatMessages.createAIMessageInternal, {
+        documentId: args.documentId,
+        userId: identity.subject,
+        content: summaryMessage,
+        suggestionId,
+      });
+
       return {
         success: true,
-        message: "Advanced AI suggestions generated successfully",
+        message: summaryMessage,
         suggestionId,
         changeGroupCount: changeGroups.length,
       };
