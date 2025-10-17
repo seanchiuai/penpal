@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Claude Code Instructions
 
-### Custom Agents and Plans
+### Custom Agents, Plans, and Specification
 - **`/agents`** - Contains custom agent definitions for specialized tasks
   - Before implementing features, check if a relevant agent exists in this directory
   - Invoke custom agents using the Task tool when their expertise matches the request
@@ -16,14 +16,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   - Plans provide architecture decisions, file locations, and implementation details
   - If a user requests a feature with a plan, always reference and follow that plan
   - If no matching plan exists, proceed with the implementation normally
+  - If the user requests for a new feature, create implementation plans here
+- **`/spec`** - Contains the high-level spec sheet (`spec-sheet.md`) that describes the app's purpose, core features, UI design, and overall tech stack
+  - Always review `/spec/spec-sheet.md` to understand the project's goals and requirements before starting or suggesting any major changes
+  - If a user asks for an app change that does not align with the current spec sheet, **pause and confirm with the user before proceeding**. Once confirmed, update the spec sheet accordingly to ensure project documentation stays accurate and in sync with development
+  - The spec sheet is the canonical source for the intended behavior and architecture of the app, not just the tech stack
 
-### Project Specifications
-- The `/spec` directory contains a high-level spec sheet (`spec-sheet.md`) that describes the app's purpose, core features, UI design, and overall tech stack.
-- Always review `/spec/spec-sheet.md` to understand the project's goals and requirements before starting or suggesting any major changes.
-- If a user asks for an app change that does not align with the current spec sheet, **pause and confirm with the user before proceeding**. Once confirmed, update the spec sheet accordingly to ensure project documentation stays accurate and in sync with development.
-- The spec sheet is the canonical source for the intended behavior and architecture of the app, not just the tech stack.
-
-**IMPORTANT**: Always check these directories when starting a new feature or task. Custom agents and plans provide project-specific expertise and tested approaches when available.
+**IMPORTANT**: Always check these directories when starting a new feature or task. Custom agents, plans, and the spec sheet provide project-specific expertise and tested approaches when available.
 
 ## Commands
 
