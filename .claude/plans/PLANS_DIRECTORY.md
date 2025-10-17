@@ -12,7 +12,7 @@ This directory contains implementation plans and documentation for features in t
 
 ## AI Suggestion Review
 
-**File:** `AI_SUGGESTION_REVIEW_IMPLEMENTATION.md`
+**File:** `FEATURE_AI_SUGGESTION_REVIEW_IMPLEMENTATION.md`
 
 **Status:** ✅ Implemented
 
@@ -54,7 +54,7 @@ A comprehensive AI-powered document suggestion system that allows users to reque
 
 ## Smart Editor
 
-**File:** `SMART_EDITOR_README.md`
+**File:** `FEATURE_SMART_EDITOR_IMPLEMENTATION.md`
 
 **Status:** ✅ Implemented
 
@@ -99,7 +99,7 @@ A two-panel document editor with AI-powered editing capabilities. Users can writ
 
 ## Hover Accept/Reject Individual Changes
 
-**File:** `HOVER_ACCEPT_REJECT_IMPLEMENTATION.md`
+**File:** `FEATURE_HOVER_CHANGE_CONTROL_IMPLEMENTATION.md`
 
 **Status:** ✅ Implemented (Enhancement to Smart Editor)
 
@@ -159,11 +159,11 @@ Granular hover-based accept/reject functionality for individual AI-suggested cha
 4. Testing instructions are included
 
 ### File Naming Convention:
-- `UPPER_CASE.md` - Implementation reports and documentation
-- `lower_case.md` - Planning documents and roadmaps (removed for being redundant)
+- `FEATURE_[NAME]_IMPLEMENTATION.md` - All implementation plans and documentation follow this format
+- Names should be concise and descriptive (e.g., `FEATURE_AI_SUGGESTION_REVIEW_IMPLEMENTATION.md`, `FEATURE_HOVER_CHANGE_CONTROL_IMPLEMENTATION.md`)
 
 ### Adding New Plans:
-1. Create a new markdown file in this directory
+1. Create a new markdown file with `FEATURE_` prefix and `_IMPLEMENTATION` suffix (e.g., `FEATURE_NEW_FEATURE_NAME_IMPLEMENTATION.md`)
 2. Follow the format of existing plans
 3. Include: Status, Summary, Key Features, Technology Stack, Key Files, Setup Required
 4. Update this PLANS_DIRECTORY.md file with a new entry
